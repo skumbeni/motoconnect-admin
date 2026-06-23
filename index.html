@@ -439,6 +439,8 @@
                 <th>Plan</th>
                 <th>Price/mo</th>
                 <th>Expiry</th>
+                <th>Hours</th>
+                <th>Trips</th>
                 <th>Status</th>
                 <th>Actions</th>
               </tr>
@@ -560,6 +562,12 @@
           <input type="number" id="settingWarnDays" min="1" max="30" value="7"/>
         </div>
         <button class="btn btn-primary btn-sm" onclick="saveWarnDays()">Save</button>
+      </div>
+
+      <div class="settings-card">
+        <h3>💬 Zone WhatsApp Group Links</h3>
+        <p style="font-size:.82rem;color:var(--muted);margin-bottom:.9rem">Set a WhatsApp group invite link for each zone. Customers will see a "Join Group" button on the public directory.</p>
+        <div id="zoneWaGroupList"></div>
       </div>
 
       <div class="settings-card">
@@ -761,6 +769,14 @@
         <label>Notes</label>
         <textarea id="subNotes" rows="2" placeholder="Optional notes…"></textarea>
       </div>
+      <div class="form-row">
+        <label>Operating Hours</label>
+        <input type="text" id="subHours" placeholder="e.g. Mon–Sat 06:00–20:00"/>
+      </div>
+      <div class="form-row">
+        <label>Trips Completed</label>
+        <input type="number" id="subTrips" min="0" placeholder="0" value="0"/>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-ghost btn-sm" onclick="closeModal('subModal')">Cancel</button>
@@ -810,7 +826,7 @@
 // ══════════════════════════════════════════════════════
 //  CONSTANTS & STATE
 // ══════════════════════════════════════════════════════
-const KEYS={pw:'mc_password',subs:'mc_subscriptions',settings:'mc_admin_settings',fbConfig:'mc_fb_config'};
+const KEYS={pw:'mc_password',subs:'mc_subscriptions',settings:'mc_admin_settings',fbConfig:'mc_fb_config',zones:'mc_zones'};
 const DEFAULT_PW='admin123';
 const FB_PATH='motoconnect_mansa';
 let state={adminName:'Admin',warnDays:7};
@@ -824,6 +840,17 @@ function load(key,def){try{const v=localStorage.getItem(key);return v!==null?JSO
 function getPassword(){return load(KEYS.pw,DEFAULT_PW);}
 function getSubs(){return load(KEYS.subs,[]);}
 function getSettings(){return load(KEYS.settings,{adminName:'Admin',warnDays:7});}
+function getZones(){return load(KEYS.zones,[
+  {id:'z1',name:'Mansa Central',desc:'Town centre area',mult:1.0},
+  {id:'z2',name:'Mansa North',desc:'Residential north area',mult:1.2},
+  {id:'z3',name:'Mansa Market',desc:'Busy market zone',mult:1.5},
+]);}
+function saveZoneWaGroup(zoneId,url){
+  const zones=getZones();
+  const i=zones.findIndex(z=>z.id===zoneId);
+  if(i>-1){zones[i].waGroup=url.trim();}
+  save(KEYS.zones,zones);
+}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
 function esc(s){const d=document.createElement('div');d.textContent=s||'';return d.innerHTML;}
 function todayStr(){return new Date().toISOString().slice(0,10);}
@@ -1356,6 +1383,8 @@ function renderSubscriptions(){
       <td><span class="pill-plan">${esc(s.plan||'—')}</span></td>
       <td>K${(s.price||0).toLocaleString()}</td>
       <td>${fmtDate(s.expiry)}</td>
+      <td style="font-size:.78rem;color:var(--muted)">${esc(s.hours||'—')}</td>
+      <td style="text-align:center;font-weight:700;color:#0d9669">${s.trips||0}</td>
       <td>${statusBadge}</td>
       <td>
         <div class="row-actions">
@@ -1372,7 +1401,8 @@ function renderSubscriptions(){
 function openAddSubModal(){
   document.getElementById('subEditId').value='';
   document.getElementById('subModalTitle').textContent='Add Rider';
-  ['subName','subPhone','subPrice','subNotes'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['subName','subPhone','subPrice','subNotes','subHours'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';})
+  const tripsEl=document.getElementById('subTrips');if(tripsEl)tripsEl.value=0;;
   document.getElementById('subStart').value=todayStr();
   document.getElementById('subStatus').value='active';
   openModal('subModal');
@@ -1392,6 +1422,8 @@ function openEditSubModal(id){
   document.getElementById('subDuration').value=s.duration||'1';
   document.getElementById('subStatus').value=s.status||'active';
   document.getElementById('subNotes').value=s.notes||'';
+  document.getElementById('subHours').value=s.hours||'';
+  document.getElementById('subTrips').value=s.trips||0;
   openModal('subModal');
 }
 
@@ -1406,6 +1438,8 @@ function saveSub(){
   const duration=document.getElementById('subDuration').value;
   const status=document.getElementById('subStatus').value;
   const notes=document.getElementById('subNotes').value.trim();
+  const hours=document.getElementById('subHours')?.value.trim()||'';
+  const trips=parseInt(document.getElementById('subTrips')?.value)||0;
   if(!name){alert('Name is required.');return;}
   const expDate=new Date(start);
   expDate.setMonth(expDate.getMonth()+parseInt(duration));
@@ -1413,9 +1447,9 @@ function saveSub(){
   const subs=getSubs();
   if(editId){
     const i=subs.findIndex(s=>s.id===editId);
-    if(i>-1)subs[i]={...subs[i],name,phone,type,plan,price,start,duration,expiry,status,notes};
+    if(i>-1)subs[i]={...subs[i],name,phone,type,plan,price,start,duration,expiry,status,notes,hours,trips};
   }else{
-    subs.push({id:uid(),name,phone,type,plan,price,start,duration,expiry,status,notes,created:new Date().toISOString(),availability:'available'});
+    subs.push({id:uid(),name,phone,type,plan,price,start,duration,expiry,status,notes,hours,trips,created:new Date().toISOString(),availability:'available'});
   }
   save(KEYS.subs,subs);
   // Write only the changed item (or do full save for new additions)
@@ -1563,6 +1597,25 @@ function loadSettingsPage(){
   const cfg=getSavedFbConfig();
   const inp=document.getElementById('fbConfigInput');
   if(cfg&&inp)inp.value=JSON.stringify(cfg,null,2);
+  // Render zone WA group link inputs
+  const zoneList=document.getElementById('zoneWaGroupList');
+  if(zoneList){
+    const zones=getZones();
+    zoneList.innerHTML=zones.map(z=>`
+      <div style="margin-bottom:.75rem">
+        <label style="font-size:.78rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:.3rem">${esc(z.name)}</label>
+        <div style="display:flex;gap:.5rem">
+          <input type="url" id="waGroup_${z.id}" placeholder="https://chat.whatsapp.com/..." value="${esc(z.waGroup||'')}" style="flex:1;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;padding:.55rem .8rem;color:var(--text);font-size:.85rem;outline:none"/>
+          <button class="btn btn-success btn-sm" onclick="saveZoneWaGroupInput('${z.id}')">Save</button>
+        </div>
+      </div>`).join('');
+  }
+}
+function saveZoneWaGroupInput(zoneId){
+  const inp=document.getElementById('waGroup_'+zoneId);
+  if(!inp)return;
+  saveZoneWaGroup(zoneId,inp.value);
+  showFbMsg('✅ WhatsApp group link saved for zone.','alert-ok');
 }
 
 function saveAdminName(){

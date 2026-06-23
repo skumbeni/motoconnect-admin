@@ -1,0 +1,1641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<title>MotoConnect Mansa — Admin Panel</title>
+<meta name="theme-color" content="#1e3a5f"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<style>
+  :root{
+    --bg:#f0f4f8;--surface:#fff;--surface2:#f7f9fc;
+    --sidebar-bg:#1e3a5f;--sidebar-text:#c8daf0;--sidebar-muted:#7fa4c8;
+    --sidebar-active-bg:rgba(245,158,11,.18);--sidebar-active-text:#fbbf24;
+    --sidebar-border:rgba(255,255,255,.08);
+    --border:#dde3ec;--accent:#e8820c;--accent-light:#fff7ed;
+    --accent2:#0d9669;--accent2-light:#ecfdf5;
+    --danger:#dc2626;--danger-light:#fef2f2;
+    --warn:#d97706;--warn-light:#fffbeb;
+    --text:#1e293b;--muted:#64748b;
+    --radius:10px;--shadow:0 1px 8px rgba(30,58,95,.10),0 4px 20px rgba(30,58,95,.07);
+    --font:'Segoe UI',system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh}
+
+  /* ── LOGIN ── */
+  #loginPage{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:1rem;background:linear-gradient(135deg,#1e3a5f 0%,#2d5a8e 60%,#1a6b55 100%)}
+  .login-card{background:#fff;border-radius:18px;padding:2.5rem 2rem;width:100%;max-width:360px;box-shadow:0 8px 40px rgba(30,58,95,.22);text-align:center}
+  .login-logo{font-size:2.8rem;margin-bottom:.5rem}
+  .login-card h1{font-size:1.5rem;font-weight:700;color:var(--sidebar-bg);letter-spacing:-.5px}
+  .login-card p{color:var(--muted);font-size:.85rem;margin:.3rem 0 1.8rem}
+  .input-wrap{margin-bottom:1rem;text-align:left}
+  .input-wrap label{display:block;font-size:.75rem;color:var(--muted);margin-bottom:.3rem;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+  .input-wrap input{width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius);padding:.7rem .9rem;color:var(--text);font-size:.95rem;outline:none;transition:border .2s}
+  .input-wrap input:focus{border-color:var(--accent)}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:.4rem;padding:.65rem 1.2rem;border:none;border-radius:var(--radius);font-size:.875rem;font-weight:600;cursor:pointer;transition:opacity .15s,transform .1s;font-family:inherit}
+  .btn:active{transform:scale(.98)}
+  .btn-primary{background:var(--accent);color:#fff;width:100%}
+  .btn-primary:hover{opacity:.9}
+  .btn-sm{padding:.38rem .8rem;font-size:.8rem}
+  .btn-ghost{background:transparent;border:1.5px solid var(--border);color:var(--text)}
+  .btn-ghost:hover{background:var(--surface2)}
+  .btn-danger{background:var(--danger);color:#fff}
+  .btn-danger:hover{opacity:.88}
+  .btn-success{background:var(--accent2);color:#fff}
+  .btn-success:hover{opacity:.88}
+  .btn-warn{background:var(--warn);color:#fff}
+  .alert{padding:.65rem .9rem;border-radius:8px;font-size:.83rem;margin-top:.75rem;text-align:left}
+  .alert-err{background:var(--danger-light);border:1px solid #fca5a5;color:#991b1b}
+  .alert-ok{background:var(--accent2-light);border:1px solid #6ee7b7;color:#065f46}
+  .alert-warn{background:var(--warn-light);border:1px solid #fcd34d;color:#92400e}
+  .alert-info{background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af}
+
+  /* ── LAYOUT ── */
+  #app{display:none;min-height:100vh}
+  .sidebar{position:fixed;top:0;left:0;height:100vh;width:220px;background:var(--sidebar-bg);display:flex;flex-direction:column;z-index:100;transition:transform .25s}
+  .sidebar-logo{padding:1.2rem 1rem;border-bottom:1px solid var(--sidebar-border)}
+  .sidebar-logo h2{font-size:1rem;font-weight:700;color:#fbbf24;margin-bottom:.1rem}
+  .sidebar-logo span{font-size:.72rem;color:var(--sidebar-muted)}
+  nav{flex:1;padding:.75rem .5rem;overflow-y:auto}
+  .nav-label{font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--sidebar-muted);padding:.6rem .6rem .3rem;margin-top:.5rem}
+  .nav-item{display:flex;align-items:center;gap:.6rem;padding:.58rem .75rem;border-radius:8px;cursor:pointer;font-size:.875rem;color:var(--sidebar-text);transition:background .15s,color .15s;margin-bottom:.1rem;user-select:none}
+  .nav-item:hover{background:rgba(255,255,255,.09);color:#fff}
+  .nav-item.active{background:var(--sidebar-active-bg);color:var(--sidebar-active-text);font-weight:600}
+  .nav-badge{background:var(--danger);color:#fff;border-radius:10px;padding:.05rem .4rem;font-size:.65rem;font-weight:700;min-width:16px;text-align:center;margin-left:auto}
+  .sidebar-footer{padding:.9rem 1rem;border-top:1px solid var(--sidebar-border)}
+  .user-row{display:flex;align-items:center;gap:.6rem}
+  .avatar{width:32px;height:32px;border-radius:50%;background:#e8820c;color:#fff;font-weight:700;font-size:.85rem;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .user-name{color:#fff;font-size:.82rem;font-weight:600}
+  .user-role{color:var(--sidebar-muted);font-size:.7rem}
+  .sidebar-btns{display:flex;gap:.4rem;margin-top:.6rem}
+  .sidebar-btns .btn-ghost{border-color:var(--sidebar-border);color:var(--sidebar-text);flex:1;font-size:.75rem;padding:.35rem .5rem}
+  .sidebar-btns .btn-ghost:hover{background:rgba(255,255,255,.09);color:#fff}
+
+  .topbar{position:fixed;top:0;left:220px;right:0;height:52px;background:#fff;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 1.25rem;z-index:99;box-shadow:0 1px 4px rgba(30,58,95,.06)}
+  .topbar-title{font-size:.95rem;font-weight:600;color:var(--text)}
+  .topbar-right{display:flex;align-items:center;gap:.75rem}
+  .hamburger{display:none;background:none;border:none;color:var(--text);font-size:1.3rem;cursor:pointer}
+  .sync-dot{width:8px;height:8px;border-radius:50%;background:#94a3b8;transition:background .3s}
+  .sync-dot.live{background:#10b981}
+  .sync-dot.syncing{background:#f59e0b;animation:pulse .8s infinite alternate}
+  @keyframes pulse{to{opacity:.4}}
+  .sync-label{font-size:.72rem;color:var(--muted)}
+
+  .main{margin-left:220px;padding-top:52px;min-height:100vh;background:var(--bg)}
+  .page{display:none;padding:1.5rem}
+  .page.active{display:block}
+
+  /* ── PAGE HEADER ── */
+  .page-head{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem;margin-bottom:1.25rem}
+  .page-head h2{font-size:1.1rem;font-weight:700;color:var(--text)}
+  .page-head-sub{font-size:.8rem;color:var(--muted);margin-top:.15rem}
+
+  /* ── STATS ── */
+  .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:1rem;margin-bottom:1.5rem}
+  .stat-card{background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:1rem 1.1rem;box-shadow:var(--shadow)}
+  .stat-label{font-size:.72rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:.3rem}
+  .stat-value{font-size:1.75rem;font-weight:700;line-height:1;color:var(--text)}
+  .stat-sub{font-size:.74rem;color:var(--muted);margin-top:.3rem}
+  .stat-up{color:var(--accent2)}
+  .stat-warn{color:var(--warn)}
+  .stat-danger{color:var(--danger)}
+
+  /* ── CARDS & TABLES ── */
+  .card{background:#fff;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);margin-bottom:1.25rem}
+  .card-header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;padding:.8rem 1.1rem;border-bottom:1px solid var(--border);background:var(--surface2)}
+  .card-header h3{font-size:.9rem;font-weight:600;color:var(--text)}
+  .card-body{padding:1rem 1.1rem}
+  .table-wrap{overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-size:.83rem}
+  th{background:#f1f5fb;color:var(--muted);font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;padding:.55rem .75rem;text-align:left;white-space:nowrap}
+  td{padding:.6rem .75rem;border-bottom:1px solid #f0f2f6;vertical-align:middle;color:var(--text)}
+  tr:last-child td{border-bottom:none}
+  tr:hover td{background:#fafbff}
+
+  /* ── BADGES ── */
+  .badge{display:inline-block;padding:.18rem .5rem;border-radius:20px;font-size:.7rem;font-weight:600}
+  .badge-active{background:#d1fae5;color:#065f46}
+  .badge-pending{background:#ffedd5;color:#92400e}
+  .badge-expired{background:#fee2e2;color:#991b1b}
+  .badge-expiring{background:#fef9c3;color:#854d0e}
+  .badge-rejected{background:#f1f5f9;color:#64748b}
+
+  /* ── TOOLBAR ── */
+  .toolbar{display:flex;flex-wrap:wrap;gap:.6rem;margin-bottom:1rem;align-items:center}
+  .search-input{background:#fff;border:1.5px solid var(--border);border-radius:8px;padding:.48rem .8rem;color:var(--text);font-size:.83rem;width:210px;outline:none}
+  .search-input:focus{border-color:var(--accent)}
+  .filter-select{background:#fff;border:1.5px solid var(--border);color:var(--text);border-radius:8px;padding:.48rem .7rem;font-size:.8rem;cursor:pointer;outline:none}
+  .filter-select:focus{border-color:var(--accent)}
+
+  /* ── MODALS ── */
+  .overlay{position:fixed;inset:0;background:rgba(15,30,55,.45);z-index:200;display:none;align-items:center;justify-content:center;padding:1rem}
+  .overlay.open{display:flex}
+  .modal{background:#fff;border:1px solid var(--border);border-radius:14px;width:100%;max-width:480px;box-shadow:0 8px 40px rgba(30,58,95,.18);max-height:90vh;overflow-y:auto}
+  .modal-header{display:flex;align-items:center;justify-content:space-between;padding:.9rem 1.2rem;border-bottom:1px solid var(--border);background:var(--surface2)}
+  .modal-header h3{font-size:.95rem;font-weight:600}
+  .modal-body{padding:1.2rem}
+  .modal-footer{padding:.85rem 1.2rem;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:.6rem;background:var(--surface2)}
+  .close-btn{background:none;border:none;color:var(--muted);font-size:1.2rem;cursor:pointer;padding:.2rem}
+  .close-btn:hover{color:var(--text)}
+  .form-row{margin-bottom:.9rem}
+  .form-row label{display:block;font-size:.75rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:.3rem}
+  .form-row input,.form-row select,.form-row textarea{width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;padding:.6rem .8rem;color:var(--text);font-size:.88rem;outline:none;transition:border .2s;font-family:inherit}
+  .form-row input:focus,.form-row select:focus,.form-row textarea:focus{border-color:var(--accent)}
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:.75rem}
+  .row-actions{display:flex;gap:.35rem;flex-wrap:nowrap}
+
+  /* ── APPLICATION CARDS ── */
+  .app-card{background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:1rem 1.1rem;margin-bottom:.75rem;box-shadow:var(--shadow);display:flex;gap:1rem;align-items:flex-start}
+  .app-card.pending{border-left:4px solid var(--warn)}
+  .app-card.active{border-left:4px solid var(--accent2)}
+  .app-card.rejected{border-left:4px solid #cbd5e1;opacity:.7}
+  .app-icon{font-size:1.8rem;flex-shrink:0;line-height:1}
+  .app-info{flex:1;min-width:0}
+  .app-name{font-weight:700;font-size:.95rem;color:var(--text);margin-bottom:.2rem}
+  .app-meta{font-size:.78rem;color:var(--muted);line-height:1.7}
+  .app-ref{font-size:.7rem;font-family:monospace;color:var(--muted);margin-top:.3rem;background:var(--surface2);border-radius:6px;padding:.15rem .4rem;display:inline-block}
+  .app-actions{display:flex;flex-direction:column;gap:.4rem;flex-shrink:0}
+  @media(max-width:500px){.app-card{flex-wrap:wrap}.app-actions{flex-direction:row}}
+
+  /* ── RENEWAL CARD ── */
+  .renewal-item{display:flex;align-items:center;justify-content:space-between;padding:.65rem .9rem;border-radius:8px;margin-bottom:.5rem;background:var(--warn-light);border:1px solid #fcd34d;gap:.75rem;flex-wrap:wrap}
+  .renewal-info{min-width:0;flex:1}
+  .renewal-name{font-weight:600;font-size:.88rem}
+  .renewal-sub{font-size:.76rem;color:var(--muted)}
+
+  /* ── ID CARD ── */
+  .id-card{background:linear-gradient(135deg,#1e3a5f 0%,#2d5a8e 100%);border-radius:14px;padding:1.25rem;color:#fff;text-align:center;position:relative;overflow:hidden;max-width:320px;margin:0 auto}
+  .id-card::before{content:'🏍️';position:absolute;font-size:8rem;opacity:.07;top:-10px;right:-20px}
+  .id-card-logo{font-size:.7rem;font-weight:700;color:#fbbf24;letter-spacing:1px;text-transform:uppercase;margin-bottom:.7rem}
+  .id-card-avatar{width:60px;height:60px;border-radius:50%;background:#e8820c;display:flex;align-items:center;justify-content:center;font-size:1.6rem;font-weight:700;color:#fff;margin:0 auto .6rem;border:3px solid rgba(255,255,255,.3)}
+  .id-card-name{font-size:1.1rem;font-weight:700;margin-bottom:.25rem}
+  .id-card-type{background:rgba(255,255,255,.15);border-radius:20px;padding:.2rem .7rem;font-size:.75rem;color:#fde68a;font-weight:600;display:inline-block;margin-bottom:.75rem}
+  .id-card-row{display:flex;justify-content:space-between;font-size:.75rem;color:rgba(255,255,255,.75);margin-bottom:.3rem;text-align:left}
+  .id-card-row strong{color:#fff}
+  .id-card-divider{height:1px;background:rgba(255,255,255,.15);margin:.75rem 0}
+  .id-card-footer{font-size:.65rem;color:rgba(255,255,255,.5);margin-top:.6rem}
+
+  /* ── FIREBASE CONFIG ── */
+  .fb-config-area{background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;padding:.6rem .8rem;font-size:.78rem;font-family:monospace;width:100%;min-height:90px;resize:vertical;color:var(--text);outline:none}
+  .fb-config-area:focus{border-color:var(--accent)}
+  .fb-status-row{display:flex;align-items:center;gap:.6rem;margin-bottom:.75rem}
+  .fb-status-dot{width:10px;height:10px;border-radius:50%;background:#94a3b8;flex-shrink:0;transition:background .3s}
+  .fb-status-dot.live{background:#10b981}
+
+  /* ── EMPTY ── */
+  .empty{text-align:center;padding:2.5rem 1rem;color:var(--muted);font-size:.875rem}
+  .empty-icon{font-size:2.5rem;margin-bottom:.6rem;opacity:.6}
+
+  /* ── SETTINGS ── */
+  .settings-card{background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:1.2rem;max-width:500px;margin-bottom:1.2rem;box-shadow:var(--shadow)}
+  .settings-card h3{font-size:.9rem;font-weight:600;margin-bottom:.9rem;padding-bottom:.55rem;border-bottom:1px solid var(--border)}
+
+  /* ── RESPONSIVE ── */
+  @media(max-width:768px){
+    .sidebar{transform:translateX(-100%)}
+    .sidebar.open{transform:none}
+    .topbar{left:0}
+    .main{margin-left:0}
+    .hamburger{display:block}
+    .stats-grid{grid-template-columns:1fr 1fr}
+    .form-grid{grid-template-columns:1fr}
+  }
+  @media(max-width:480px){
+    .stats-grid{grid-template-columns:1fr}
+    .page{padding:1rem}
+  }
+  .overlay-bg{position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:99;display:none}
+  .overlay-bg.open{display:block}
+
+  /* ── MISC ── */
+  .divider{height:1px;background:var(--border);margin:1rem 0}
+  .text-muted{color:var(--muted)}
+  .text-accent{color:var(--accent)}
+  .text-success{color:var(--accent2)}
+  .text-danger{color:var(--danger)}
+  .bold{font-weight:600}
+  .mt-half{margin-top:.4rem}
+  .pill-plan{background:#eef2ff;border:1px solid #c7d2fe;border-radius:20px;padding:.18rem .55rem;font-size:.7rem;color:#3730a3;font-weight:600}
+</style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════════════════ -->
+<!--  LOGIN PAGE                                      -->
+<!-- ════════════════════════════════════════════════ -->
+<div id="loginPage">
+  <div class="login-card">
+    <div class="login-logo">🏍️</div>
+    <h1>MotoConnect Mansa</h1>
+    <p>Admin Panel — Subscription Management</p>
+    <div class="input-wrap">
+      <label>Password</label>
+      <input type="password" id="loginPw" placeholder="Enter admin password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()"/>
+    </div>
+    <button class="btn btn-primary" onclick="doLogin()">🔐 Sign In</button>
+    <div id="loginErr" style="display:none" class="alert alert-err">Incorrect password. Try again.</div>
+    <div id="localFileWarn" style="display:none" class="alert alert-warn" style="margin-top:.75rem;font-size:.8rem">
+      ⚠️ <strong>Opened as a local file.</strong> Firebase sync won't work from <code>content://</code> or <code>file://</code> URLs.<br>
+      Host this file on <strong>GitHub Pages</strong> or a web server for full functionality.
+    </div>
+    <p style="font-size:.73rem;color:var(--muted);margin-top:1rem">Default password: <strong>admin123</strong> — change it in Settings after login.</p>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════ -->
+<!--  MAIN APP                                        -->
+<!-- ════════════════════════════════════════════════ -->
+<div id="app">
+
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <h2>🏍️ MotoConnect</h2>
+      <span>Mansa Admin Panel</span>
+    </div>
+    <nav>
+      <div class="nav-label">Overview</div>
+      <div class="nav-item active" id="nav-dashboard" onclick="showPage('dashboard',this)">📊 Dashboard</div>
+
+      <div class="nav-label">Riders</div>
+      <div class="nav-item" id="nav-applications" onclick="showPage('applications',this)">
+        📋 Applications
+        <span class="nav-badge" id="pendingBadge" style="display:none">0</span>
+      </div>
+      <div class="nav-item" id="nav-subscriptions" onclick="showPage('subscriptions',this)">🎫 Subscriptions</div>
+      <div class="nav-item" id="nav-renewals" onclick="showPage('renewals',this)">
+        🔄 Renewals Due
+        <span class="nav-badge" id="renewalBadge" style="display:none">0</span>
+      </div>
+
+      <div class="nav-label">System</div>
+      <div class="nav-item" id="nav-firebase" onclick="showPage('firebase',this)">🔥 Firebase Sync</div>
+      <div class="nav-item" id="nav-settings" onclick="showPage('settings',this)">⚙️ Settings</div>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-row">
+        <div class="avatar" id="sidebarAvatar">A</div>
+        <div>
+          <div class="user-name" id="sidebarName">Admin</div>
+          <div class="user-role">Administrator</div>
+        </div>
+      </div>
+      <div class="sidebar-btns">
+        <button class="btn btn-ghost" onclick="doLogout()">🚪 Logout</button>
+        <button class="btn btn-ghost" onclick="showPage('settings',document.getElementById('nav-settings'))">⚙️</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Overlay for mobile sidebar -->
+  <div class="overlay-bg" id="sidebarBg" onclick="closeSidebar()"></div>
+
+  <!-- Topbar -->
+  <div class="topbar">
+    <div style="display:flex;align-items:center;gap:.75rem">
+      <button class="hamburger" onclick="toggleSidebar()">☰</button>
+      <span class="topbar-title" id="topbarTitle">Dashboard</span>
+    </div>
+    <div class="topbar-right">
+      <div class="sync-dot" id="syncDot" title="Firebase connection status"></div>
+      <span class="sync-label" id="syncLabel">Not connected</span>
+    </div>
+  </div>
+
+  <!-- Main content -->
+  <div class="main">
+
+    <!-- ── DASHBOARD ── -->
+    <div class="page active" id="page-dashboard">
+      <div class="page-head">
+        <div>
+          <h2>Dashboard</h2>
+          <div class="page-head-sub">Overview of MotoConnect Mansa operations</div>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="refreshAll()">🔄 Refresh</button>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">Total Riders</div>
+          <div class="stat-value" id="statTotal">0</div>
+          <div class="stat-sub">All subscriptions</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Active</div>
+          <div class="stat-value stat-up" id="statActive">0</div>
+          <div class="stat-sub">Current subscribers</div>
+        </div>
+        <div class="stat-card" style="cursor:pointer" onclick="showPage('applications',document.getElementById('nav-applications'))">
+          <div class="stat-label">Pending Applications</div>
+          <div class="stat-value stat-warn" id="statPending">0</div>
+          <div class="stat-sub">Awaiting review</div>
+        </div>
+        <div class="stat-card" style="cursor:pointer" onclick="showPage('renewals',document.getElementById('nav-renewals'))">
+          <div class="stat-label">Renewals Due</div>
+          <div class="stat-value stat-danger" id="statExpiring">0</div>
+          <div class="stat-sub" id="statExpiringNote">Expiring soon</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Monthly Revenue</div>
+          <div class="stat-value text-accent" id="statRevenue">K0</div>
+          <div class="stat-sub stat-up">Active subscriptions</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Expired</div>
+          <div class="stat-value text-muted" id="statExpired">0</div>
+          <div class="stat-sub">Need renewal</div>
+        </div>
+      </div>
+
+      <!-- Recent Activity -->
+      <div class="card">
+        <div class="card-header">
+          <h3>Recent Applications</h3>
+          <button class="btn btn-ghost btn-sm" onclick="showPage('applications',document.getElementById('nav-applications'))">View All →</button>
+        </div>
+        <div id="recentApps">
+          <div class="empty"><div class="empty-icon">📋</div><p>No recent applications</p></div>
+        </div>
+      </div>
+
+      <!-- Expiring soon -->
+      <div class="card">
+        <div class="card-header">
+          <h3>Expiring This Week</h3>
+          <button class="btn btn-ghost btn-sm" onclick="showPage('renewals',document.getElementById('nav-renewals'))">View All →</button>
+        </div>
+        <div id="dashExpiringList">
+          <div class="empty"><div class="empty-icon">✅</div><p>No riders expiring this week</p></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── APPLICATIONS ── -->
+    <div class="page" id="page-applications">
+      <div class="page-head">
+        <div>
+          <h2>Rider Applications</h2>
+          <div class="page-head-sub">Review and approve new rider subscription requests</div>
+        </div>
+      </div>
+      <div class="toolbar">
+        <input class="search-input" placeholder="🔍 Search name, phone, ref…" id="appSearch" oninput="renderApplications()"/>
+        <select class="filter-select" id="appFilterStatus" onchange="renderApplications()">
+          <option value="">All Status</option>
+          <option value="pending">Pending</option>
+          <option value="active">Approved</option>
+          <option value="rejected">Rejected</option>
+        </select>
+        <select class="filter-select" id="appFilterType" onchange="renderApplications()">
+          <option value="">All Types</option>
+          <option>Motorcycle Taxi</option>
+          <option>Bicycle Taxi</option>
+          <option>Tricycle (Tuk-tuk)</option>
+          <option>Mini-bus</option>
+          <option>Car Hire</option>
+        </select>
+      </div>
+      <div id="appQueueList">
+        <div class="empty"><div class="empty-icon">📋</div><p>No applications found</p></div>
+      </div>
+    </div>
+
+    <!-- ── SUBSCRIPTIONS ── -->
+    <div class="page" id="page-subscriptions">
+      <div class="page-head">
+        <div>
+          <h2>All Subscriptions</h2>
+          <div class="page-head-sub">Manage active and historical rider subscriptions</div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="openAddSubModal()">+ Add Rider</button>
+      </div>
+      <div class="toolbar">
+        <input class="search-input" placeholder="🔍 Search name, phone…" id="subSearch" oninput="renderSubscriptions()"/>
+        <select class="filter-select" id="subFilterStatus" onchange="renderSubscriptions()">
+          <option value="">All Status</option>
+          <option value="active">Active</option>
+          <option value="expired">Expired</option>
+          <option value="pending">Pending</option>
+        </select>
+        <select class="filter-select" id="subFilterPlan" onchange="renderSubscriptions()">
+          <option value="">All Plans</option>
+          <option>Basic</option>
+          <option>Standard</option>
+          <option>Premium</option>
+        </select>
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Name</th>
+                <th>Phone</th>
+                <th>Type</th>
+                <th>Plan</th>
+                <th>Price/mo</th>
+                <th>Expiry</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="subTableBody">
+              <tr><td colspan="9" class="empty">No subscriptions yet</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── RENEWALS ── -->
+    <div class="page" id="page-renewals">
+      <div class="page-head">
+        <div>
+          <h2>Renewals Due</h2>
+          <div class="page-head-sub">Riders whose subscriptions are expiring or already expired</div>
+        </div>
+      </div>
+      <div class="stats-grid" style="max-width:600px">
+        <div class="stat-card">
+          <div class="stat-label">Expiring in 7 days</div>
+          <div class="stat-value stat-warn" id="rStat7">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Already Expired</div>
+          <div class="stat-value stat-danger" id="rStatExpired">0</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <h3>🔄 Expiring / Expired Riders</h3>
+        </div>
+        <div class="card-body" id="renewalList">
+          <div class="empty"><div class="empty-icon">✅</div><p>No renewals due right now</p></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── FIREBASE ── -->
+    <div class="page" id="page-firebase">
+      <div class="page-head">
+        <h2>Firebase Sync</h2>
+      </div>
+      <div class="settings-card">
+        <h3>🔥 Connection Status</h3>
+        <div class="fb-status-row">
+          <div class="fb-status-dot" id="fbDot"></div>
+          <span id="fbStatusText" style="font-size:.83rem;color:var(--muted)">Not connected</span>
+        </div>
+        <div class="form-row">
+          <label>Firebase Config (paste JSON)</label>
+          <textarea class="fb-config-area" id="fbConfigInput" rows="6" placeholder='{"apiKey":"AIza...","authDomain":"...","databaseURL":"https://...","projectId":"..."}'>{
+  "apiKey": "AIzaSyAGqnBJXEdDU6FdQzKQSAMu2wuBHAloTBs",
+  "authDomain": "motoconnect-a0e64.firebaseapp.com",
+  "databaseURL": "https://motoconnect-a0e64-default-rtdb.firebaseio.com",
+  "projectId": "motoconnect-a0e64",
+  "storageBucket": "motoconnect-a0e64.firebasestorage.app",
+  "messagingSenderId": "838224185875",
+  "appId": "1:838224185875:web:631005b2ed350a6b84cde6"
+}</textarea>
+        </div>
+        <div style="display:flex;gap:.6rem;flex-wrap:wrap">
+          <button class="btn btn-primary btn-sm" onclick="connectFirebase()">🔗 Connect</button>
+          <button class="btn btn-ghost btn-sm" onclick="pushToFirebase()">⬆️ Push Local → Firebase</button>
+          <button class="btn btn-danger btn-sm" onclick="disconnectFirebase()">✗ Disconnect</button>
+        </div>
+        <div id="fbConfigMsg" style="display:none;margin-top:.75rem" class="alert"></div>
+      </div>
+      <div class="settings-card">
+        <h3>ℹ️ How It Works</h3>
+        <p style="font-size:.83rem;color:var(--muted);line-height:1.7">
+          This admin panel shares the same Firebase Realtime Database as the main MotoConnect app. 
+          Paste the same <strong>firebaseConfig</strong> from your Firebase console → Project Settings → Web App.<br><br>
+          Once connected, all subscription data syncs in real-time across both panels. 
+          Approvals, renewals, and new riders appear instantly on the main app.
+        </p>
+      </div>
+    </div>
+
+    <!-- ── SETTINGS ── -->
+    <div class="page" id="page-settings">
+      <div class="page-head">
+        <h2>Settings</h2>
+      </div>
+
+      <div class="settings-card">
+        <h3>👤 Admin Profile</h3>
+        <div class="form-row">
+          <label>Display Name</label>
+          <input type="text" id="settingName" placeholder="e.g. Chanda Mwale"/>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="saveAdminName()">Save Name</button>
+      </div>
+
+      <div class="settings-card">
+        <h3>🔒 Change Password</h3>
+        <div class="form-row">
+          <label>Current Password</label>
+          <input type="password" id="curPw" placeholder="Current password"/>
+        </div>
+        <div class="form-row">
+          <label>New Password</label>
+          <input type="password" id="newPw" placeholder="At least 6 characters"/>
+        </div>
+        <div class="form-row">
+          <label>Confirm New Password</label>
+          <input type="password" id="confPw" placeholder="Repeat new password"/>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="changePassword()">Update Password</button>
+        <div id="pwMsg" style="display:none;margin-top:.75rem" class="alert"></div>
+      </div>
+
+      <div class="settings-card">
+        <h3>⚠️ Renewal Warning Window</h3>
+        <div class="form-row">
+          <label>Warn when expiry is within (days)</label>
+          <input type="number" id="settingWarnDays" min="1" max="30" value="7"/>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="saveWarnDays()">Save</button>
+      </div>
+
+      <div class="settings-card">
+        <h3>🗑️ Data Management</h3>
+        <p style="font-size:.82rem;color:var(--muted);margin-bottom:.75rem">Clear all local subscription data. Firebase data is not affected.</p>
+        <button class="btn btn-danger btn-sm" onclick="clearAllData()">Clear Local Data</button>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<!-- ════════════════ MODALS ════════════════ -->
+
+<!-- Approve Application -->
+<div class="overlay" id="approveModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>✅ Approve Application</h3>
+      <button class="close-btn" onclick="closeModal('approveModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="approveRiderInfo" style="background:var(--surface2);border-radius:8px;padding:.75rem;margin-bottom:1rem;font-size:.85rem"></div>
+      <input type="hidden" id="approveAppId"/>
+      <div class="form-grid">
+        <div class="form-row">
+          <label>Plan</label>
+          <select id="approvePlan">
+            <option>Basic</option>
+            <option>Standard</option>
+            <option>Premium</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>Monthly Price (ZMW)</label>
+          <input type="number" id="approvePrice" placeholder="e.g. 150" min="0"/>
+        </div>
+        <div class="form-row">
+          <label>Start Date</label>
+          <input type="date" id="approveStart"/>
+        </div>
+        <div class="form-row">
+          <label>Duration (months)</label>
+          <select id="approveDuration">
+            <option value="1">1 month</option>
+            <option value="3">3 months</option>
+            <option value="6">6 months</option>
+            <option value="12">1 year</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>Payment Method</label>
+          <select id="approvePayMethod">
+            <option value="">— Select —</option>
+            <option>Cash</option>
+            <option>Mobile Money</option>
+            <option>Bank Transfer</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>Amount Paid (ZMW)</label>
+          <input type="number" id="approveAmountPaid" placeholder="e.g. 150" min="0"/>
+        </div>
+      </div>
+      <div class="form-row">
+        <label>Notes (optional)</label>
+        <textarea id="approveNotes" rows="2" placeholder="Any notes for this rider…"></textarea>
+      </div>
+      <div id="approveMsg" style="display:none;margin-top:.5rem"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('approveModal')">Cancel</button>
+      <button class="btn btn-success btn-sm" id="approveBtn" onclick="confirmApprove()">✅ Activate Rider</button>
+    </div>
+  </div>
+</div>
+
+<!-- Renew Subscription -->
+<div class="overlay" id="renewModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>🔄 Renew Subscription</h3>
+      <button class="close-btn" onclick="closeModal('renewModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="renewRiderInfo" style="background:var(--surface2);border-radius:8px;padding:.75rem;margin-bottom:1rem;font-size:.85rem"></div>
+      <input type="hidden" id="renewSubId"/>
+      <div class="form-grid">
+        <div class="form-row">
+          <label>Plan</label>
+          <select id="renewPlan">
+            <option>Basic</option>
+            <option>Standard</option>
+            <option>Premium</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>Monthly Price (ZMW)</label>
+          <input type="number" id="renewPrice" placeholder="e.g. 150" min="0"/>
+        </div>
+        <div class="form-row">
+          <label>New Start Date</label>
+          <input type="date" id="renewStart"/>
+        </div>
+        <div class="form-row">
+          <label>Duration (months)</label>
+          <select id="renewDuration">
+            <option value="1">1 month</option>
+            <option value="3">3 months</option>
+            <option value="6">6 months</option>
+            <option value="12">1 year</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <label>Payment Method</label>
+        <select id="renewPayMethod">
+          <option value="">— Select —</option>
+          <option>Cash</option>
+          <option>Mobile Money</option>
+          <option>Bank Transfer</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label>Amount Paid (ZMW)</label>
+        <input type="number" id="renewAmountPaid" placeholder="e.g. 150" min="0"/>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('renewModal')">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="confirmRenew()">🔄 Renew</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add/Edit Subscription -->
+<div class="overlay" id="subModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="subModalTitle">Add Rider</h3>
+      <button class="close-btn" onclick="closeModal('subModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="subEditId"/>
+      <div class="form-grid">
+        <div class="form-row">
+          <label>Full Name *</label>
+          <input type="text" id="subName" placeholder="e.g. Chanda Mwale"/>
+        </div>
+        <div class="form-row">
+          <label>Phone *</label>
+          <input type="tel" id="subPhone" placeholder="e.g. 0977 123456"/>
+        </div>
+        <div class="form-row">
+          <label>Vehicle Type</label>
+          <select id="subType">
+            <option>Motorcycle Taxi</option>
+            <option>Bicycle Taxi</option>
+            <option>Tricycle (Tuk-tuk)</option>
+            <option>Mini-bus</option>
+            <option>Car Hire</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>Plan</label>
+          <select id="subPlan">
+            <option>Basic</option>
+            <option>Standard</option>
+            <option>Premium</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>Monthly Price (ZMW)</label>
+          <input type="number" id="subPrice" placeholder="e.g. 150" min="0"/>
+        </div>
+        <div class="form-row">
+          <label>Start Date</label>
+          <input type="date" id="subStart"/>
+        </div>
+        <div class="form-row">
+          <label>Duration (months)</label>
+          <select id="subDuration">
+            <option value="1">1 month</option>
+            <option value="3">3 months</option>
+            <option value="6">6 months</option>
+            <option value="12">1 year</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>Status</label>
+          <select id="subStatus">
+            <option value="active">Active</option>
+            <option value="pending">Pending</option>
+            <option value="expired">Expired</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <label>Notes</label>
+        <textarea id="subNotes" rows="2" placeholder="Optional notes…"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('subModal')">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="saveSub()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ID Card -->
+<div class="overlay" id="idCardModal">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-header">
+      <h3>🆔 Rider ID Card</h3>
+      <button class="close-btn" onclick="closeModal('idCardModal')">✕</button>
+    </div>
+    <div class="modal-body" id="idCardBody"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('idCardModal')">Close</button>
+      <button class="btn btn-primary btn-sm" onclick="window.print()">🖨️ Print</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm -->
+<div class="overlay" id="confirmModal">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-header">
+      <h3>Confirm Action</h3>
+      <button class="close-btn" onclick="closeModal('confirmModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p id="confirmMsg" style="font-size:.9rem;color:var(--text)"></p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('confirmModal')">Cancel</button>
+      <button class="btn btn-danger btn-sm" id="confirmOkBtn">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+
+<script>
+// ══════════════════════════════════════════════════════
+//  CONSTANTS & STATE
+// ══════════════════════════════════════════════════════
+const KEYS={pw:'mc_password',subs:'mc_subscriptions',settings:'mc_admin_settings',fbConfig:'mc_fb_config'};
+const DEFAULT_PW='admin123';
+const FB_PATH='motoconnect_mansa';
+let state={adminName:'Admin',warnDays:7};
+let _fbApp=null,_fbDb=null,_fbAuth=null,_fbConnected=false;
+
+// ══════════════════════════════════════════════════════
+//  STORAGE
+// ══════════════════════════════════════════════════════
+function save(key,data){try{localStorage.setItem(key,JSON.stringify(data));}catch(e){}}
+function load(key,def){try{const v=localStorage.getItem(key);return v!==null?JSON.parse(v):def;}catch(e){return def;}}
+function getPassword(){return load(KEYS.pw,DEFAULT_PW);}
+function getSubs(){return load(KEYS.subs,[]);}
+function getSettings(){return load(KEYS.settings,{adminName:'Admin',warnDays:7});}
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
+function esc(s){const d=document.createElement('div');d.textContent=s||'';return d.innerHTML;}
+function todayStr(){return new Date().toISOString().slice(0,10);}
+function toDateStr(d){return d.toISOString().slice(0,10);}
+function fmtDate(s){if(!s)return'—';try{return new Date(s).toLocaleDateString('en-ZM',{day:'numeric',month:'short',year:'numeric'});}catch{return s;}}
+function daysUntil(s){if(!s)return null;const diff=Math.ceil((new Date(s)-new Date())/(1000*60*60*24));return diff;}
+
+// ══════════════════════════════════════════════════════
+//  FIREBASE — intensified sync
+// ══════════════════════════════════════════════════════
+let _pendingWrites=[];  // offline write queue
+let _listenerAttached=false;
+
+const HARDCODED_FB_CONFIG={
+  apiKey:"AIzaSyAGqnBJXEdDU6FdQzKQSAMu2wuBHAloTBs",
+  authDomain:"motoconnect-a0e64.firebaseapp.com",
+  databaseURL:"https://motoconnect-a0e64-default-rtdb.firebaseio.com",
+  projectId:"motoconnect-a0e64",
+  storageBucket:"motoconnect-a0e64.firebasestorage.app",
+  messagingSenderId:"838224185875",
+  appId:"1:838224185875:web:631005b2ed350a6b84cde6",
+  measurementId:"G-NRSPEN9Q4B"
+};
+function getSavedFbConfig(){try{const v=localStorage.getItem(KEYS.fbConfig);return v?JSON.parse(v):HARDCODED_FB_CONFIG;}catch{return HARDCODED_FB_CONFIG;}}
+
+function setFbStatus(connected,msg){
+  _fbConnected=connected;
+  const dot=document.getElementById('fbDot');
+  const syncDot=document.getElementById('syncDot');
+  const txt=document.getElementById('fbStatusText');
+  const lbl=document.getElementById('syncLabel');
+  if(dot){dot.className='fb-status-dot'+(connected?' live':'');}
+  if(syncDot){syncDot.className='sync-dot'+(connected?' live':'');}
+  if(txt)txt.textContent=msg||(connected?'Connected — real-time sync active':'Not connected');
+  if(lbl)lbl.textContent=connected?'Live':'Offline';
+}
+
+async function connectFirebase(configStr){
+  try{
+    let cfg=configStr||document.getElementById('fbConfigInput')?.value?.trim();
+    if(!cfg){const s=getSavedFbConfig();if(s)cfg=JSON.stringify(s);}
+    if(!cfg){showFbMsg('No config provided.','alert-err');return;}
+    cfg=cfg.replace(/^[\s\S]*?({)/,'$1').replace(/;?\s*$/,'');
+    const parsed=JSON.parse(cfg);
+    if(!parsed.databaseURL){showFbMsg('databaseURL is required.','alert-err');return;}
+    if(_fbApp){try{_fbApp.delete();}catch(e){}_listenerAttached=false;}
+    _fbApp=firebase.initializeApp(parsed,'mca-'+Date.now());
+    _fbAuth=firebase.auth(_fbApp);
+    _fbDb=firebase.database(_fbApp);
+    // Sign in anonymously so Firebase Auth rules (auth != null) are satisfied
+    try{
+      await _fbAuth.signInAnonymously();
+    }catch(authErr){
+      console.warn('Anonymous auth failed:',authErr.message);
+      // Continue anyway — rules may still allow if connectivity is the issue
+    }
+    save(KEYS.fbConfig,parsed);
+    setFbStatus(true,'Connected → '+parsed.projectId);
+    showFbMsg('✅ Firebase connected! Real-time sync active.','alert-ok');
+    attachListeners();
+  }catch(err){
+    setFbStatus(false,'Connection failed');
+    showFbMsg('❌ Connection failed: '+err.message,'alert-err');
+  }
+}
+
+function disconnectFirebase(){
+  if(_fbAuth){try{_fbAuth.signOut();}catch(e){}}
+  if(_fbApp){try{_fbApp.delete();}catch(e){}}
+  _fbApp=null;_fbDb=null;_fbAuth=null;_fbConnected=false;_listenerAttached=false;
+  localStorage.removeItem(KEYS.fbConfig);
+  setFbStatus(false,'Disconnected');
+  showFbMsg('Disconnected. Using local storage only.','alert-warn');
+}
+
+function attachListeners(){
+  if(!_fbDb||_listenerAttached)return;
+  _listenerAttached=true;
+
+  // Real-time subscription listener
+  _fbDb.ref(FB_PATH+'/subscriptions').on('value',snap=>{
+    const data=snap.val();
+    if(data&&typeof data==='object'){
+      const items=Object.values(data).filter(Boolean);
+      if(items.length>0){
+        // Auto-expire before saving
+        const today=new Date();today.setHours(0,0,0,0);
+        items.forEach(s=>{if(s.status==='active'&&s.expiry&&new Date(s.expiry)<today)s.status='expired';});
+        save(KEYS.subs,items);
+        refreshAll();
+      }
+    }
+  },err=>{
+    console.error('FB listener error:',err);
+    setFbStatus(false,'Listener error — retrying…');
+    _listenerAttached=false;
+    setTimeout(()=>attachListeners(),5000);
+  });
+
+  // Connection state — flush offline queue on reconnect
+  _fbDb.ref('.info/connected').on('value',snap=>{
+    if(snap.val()===true){
+      setFbStatus(true,'Connected — live');
+      flushPendingWrites();
+    } else {
+      setFbStatus(false,'Offline — local cache');
+    }
+  });
+}
+
+// Write a single rider node directly (safer than full replace)
+async function fbWriteItem(item){
+  if(!item||!item.id)return false;
+  if(!_fbDb||!_fbConnected){
+    _pendingWrites.push({type:'item',item});
+    console.warn('FB offline — queued write for',item.id);
+    return false;
+  }
+  try{
+    setSyncDot('syncing');
+    await _fbDb.ref(FB_PATH+'/subscriptions/'+item.id).set(item);
+    setSyncDot('live');
+    return true;
+  }catch(err){
+    setSyncDot('live');
+    console.error('fbWriteItem failed:',err);
+    _pendingWrites.push({type:'item',item});
+    throw err;
+  }
+}
+
+// Full list save (used for batch ops like deletions)
+async function fbSave(items){
+  save(KEYS.subs,items);
+  if(!_fbDb||!_fbConnected){
+    _pendingWrites.push({type:'full',items:[...items]});
+    console.warn('FB offline — queued full save');
+    return false;
+  }
+  try{
+    setSyncDot('syncing');
+    const obj={};
+    items.forEach(it=>{if(it.id)obj[it.id]=it;});
+    await _fbDb.ref(FB_PATH+'/subscriptions').set(obj);
+    setSyncDot('live');
+    return true;
+  }catch(err){
+    setSyncDot('live');
+    console.error('fbSave failed:',err);
+    _pendingWrites.push({type:'full',items:[...items]});
+    throw err;
+  }
+}
+
+// Flush queued writes when connection restores
+async function flushPendingWrites(){
+  if(!_pendingWrites.length)return;
+  const queue=[..._pendingWrites];
+  _pendingWrites=[];
+  console.log('Flushing',queue.length,'pending writes…');
+  setSyncDot('syncing');
+  try{
+    // Collapse: if there's a full-save in queue, use the last one; else apply items
+    const lastFull=queue.filter(w=>w.type==='full').pop();
+    if(lastFull){
+      const obj={};
+      lastFull.items.forEach(it=>{if(it.id)obj[it.id]=it;});
+      await _fbDb.ref(FB_PATH+'/subscriptions').set(obj);
+    } else {
+      for(const w of queue){
+        if(w.type==='item') await _fbDb.ref(FB_PATH+'/subscriptions/'+w.item.id).set(w.item);
+      }
+    }
+    setSyncDot('live');
+    showFbMsg('✅ Offline writes synced to Firebase.','alert-ok');
+  }catch(err){
+    setSyncDot('live');
+    _pendingWrites=[...queue,..._pendingWrites]; // put back
+    console.error('Flush failed:',err);
+  }
+}
+
+function setSyncDot(state){
+  const dot=document.getElementById('syncDot');
+  if(dot)dot.className='sync-dot'+( state==='live'?' live':state==='syncing'?' syncing':'');
+}
+
+function pushToFirebase(){
+  if(!_fbDb||!_fbConnected){alert('Connect Firebase first.');return;}
+  const obj={};
+  getSubs().forEach(s=>{if(s.id)obj[s.id]=s;});
+  setSyncDot('syncing');
+  _fbDb.ref(FB_PATH+'/subscriptions').set(obj)
+    .then(()=>{setSyncDot('live');showFbMsg('✅ All local data pushed to Firebase!','alert-ok');})
+    .catch(e=>{setSyncDot('live');showFbMsg('❌ Failed: '+e.message,'alert-err');});
+}
+
+function showFbMsg(txt,cls){
+  const el=document.getElementById('fbConfigMsg');
+  if(!el)return;
+  el.textContent=txt;el.className='alert '+cls;el.style.display='block';
+  setTimeout(()=>el.style.display='none',5000);
+}
+
+// ══════════════════════════════════════════════════════
+//  AUTH  (with brute-force lockout)
+// ══════════════════════════════════════════════════════
+const _MAX_ATTEMPTS=5;
+const _LOCKOUT_MS=15*60*1000; // 15 minutes
+function _getLockout(){try{const v=localStorage.getItem('mca_lockout');return v?JSON.parse(v):{attempts:0,until:0};}catch{return{attempts:0,until:0};}}
+function _setLockout(d){try{localStorage.setItem('mca_lockout',JSON.stringify(d));}catch{}}
+
+function doLogin(){
+  const lockout=_getLockout();
+  const now=Date.now();
+  const err=document.getElementById('loginErr');
+  if(lockout.until>now){
+    const mins=Math.ceil((lockout.until-now)/60000);
+    err.textContent='Too many attempts. Try again in '+mins+' minute'+(mins!==1?'s':'')+'.';
+    err.style.display='block';
+    return;
+  }
+  const pw=document.getElementById('loginPw').value;
+  if(pw===getPassword()){
+    _setLockout({attempts:0,until:0});
+    document.getElementById('loginPage').style.display='none';
+    document.getElementById('app').style.display='block';
+    loadSettings();
+    refreshAll();
+    connectFirebase(JSON.stringify(getSavedFbConfig()));
+  }else{
+    const attempts=lockout.attempts+1;
+    const until=attempts>=_MAX_ATTEMPTS?now+_LOCKOUT_MS:0;
+    _setLockout({attempts,until});
+    const remaining=_MAX_ATTEMPTS-attempts;
+    if(until>0){
+      err.textContent='Too many failed attempts. Locked for 15 minutes.';
+    } else {
+      err.textContent='Incorrect password. '+(remaining>0?remaining+' attempt'+(remaining!==1?'s':'')+' remaining.':'');
+    }
+    err.style.display='block';
+    setTimeout(()=>err.style.display='none',4000);
+  }
+}
+
+function doLogout(){
+  if(!confirm('Log out?'))return;
+  document.getElementById('app').style.display='none';
+  document.getElementById('loginPage').style.display='flex';
+  document.getElementById('loginPw').value='';
+}
+
+// ══════════════════════════════════════════════════════
+//  NAVIGATION
+// ══════════════════════════════════════════════════════
+const pageTitles={dashboard:'Dashboard',applications:'Rider Applications',subscriptions:'All Subscriptions',renewals:'Renewals Due',firebase:'Firebase Sync',settings:'Settings'};
+
+function showPage(id,navEl){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  const pg=document.getElementById('page-'+id);
+  if(pg)pg.classList.add('active');
+  if(navEl)navEl.classList.add('active');
+  document.getElementById('topbarTitle').textContent=pageTitles[id]||id;
+  closeSidebar();
+  if(id==='dashboard')renderDashboard();
+  else if(id==='applications')renderApplications();
+  else if(id==='subscriptions')renderSubscriptions();
+  else if(id==='renewals')renderRenewals();
+  else if(id==='settings')loadSettingsPage();
+}
+
+function toggleSidebar(){
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('sidebarBg').classList.toggle('open');
+}
+function closeSidebar(){
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebarBg').classList.remove('open');
+}
+
+// ══════════════════════════════════════════════════════
+//  MODALS
+// ══════════════════════════════════════════════════════
+function openModal(id){document.getElementById(id).classList.add('open');}
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+
+// ══════════════════════════════════════════════════════
+//  VEHICLE ICONS
+// ══════════════════════════════════════════════════════
+function vehicleIcon(type){
+  const m={
+    'Motorcycle Taxi':'🏍️','Bicycle Taxi':'🚲','Tricycle (Tuk-tuk)':'🛺','Mini-bus':'🚌','Car Hire':'🚗',
+    'Motorbike':'🏍️','Taxi':'🚖','Tour Operator':'🚌'
+  };
+  return m[type]||'🚗';
+}
+
+// ══════════════════════════════════════════════════════
+//  STATS
+// ══════════════════════════════════════════════════════
+function refreshAll(){renderDashboard();renderApplications();renderSubscriptions();renderRenewals();updateBadges();}
+
+function getSubStats(){
+  const subs=getSubs();
+  const now=new Date();
+  const active=subs.filter(s=>s.status==='active');
+  const pending=subs.filter(s=>s.status==='pending'||(s.isApplication&&s.status==='pending'));
+  const expired=subs.filter(s=>s.status==='expired');
+  const expiring=active.filter(s=>{const d=daysUntil(s.expiry);return d!==null&&d>=0&&d<=state.warnDays;});
+  const revenue=active.reduce((a,s)=>a+(s.price||0),0);
+  return{subs,active,pending,expired,expiring,revenue};
+}
+
+function updateBadges(){
+  const{pending,expiring}=getSubStats();
+  const pb=document.getElementById('pendingBadge');
+  const rb=document.getElementById('renewalBadge');
+  if(pb){pb.textContent=pending.length;pb.style.display=pending.length?'inline-block':'none';}
+  if(rb){rb.textContent=expiring.length;rb.style.display=expiring.length?'inline-block':'none';}
+}
+
+// ══════════════════════════════════════════════════════
+//  DASHBOARD
+// ══════════════════════════════════════════════════════
+function renderDashboard(){
+  const{subs,active,pending,expired,expiring,revenue}=getSubStats();
+  const set=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
+  set('statTotal',subs.filter(s=>!s.isApplication||s.status!=='pending').length);
+  set('statActive',active.length);
+  set('statPending',pending.length);
+  set('statExpiring',expiring.length);
+  set('statExpiringNote',`Within ${state.warnDays} days`);
+  set('statRevenue','K'+revenue.toLocaleString());
+  set('statExpired',expired.length);
+
+  // Recent apps
+  const recentEl=document.getElementById('recentApps');
+  const recent=getSubs().filter(s=>s.isApplication||s.status==='pending').slice(-5).reverse();
+  if(!recent.length){recentEl.innerHTML='<div class="empty"><div class="empty-icon">📋</div><p>No recent applications</p></div>';return;}
+  recentEl.innerHTML='<div style="padding:.5rem 1rem">'+recent.map(a=>`
+    <div style="display:flex;align-items:center;gap:.75rem;padding:.6rem 0;border-bottom:1px solid var(--border)">
+      <span style="font-size:1.4rem">${vehicleIcon(a.type)}</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:.88rem">${esc(a.name)}</div>
+        <div style="font-size:.75rem;color:var(--muted)">${esc(a.type||'—')} · ${esc(a.zone||'—')} · ${esc(a.plan||'—')}</div>
+      </div>
+      <span class="badge badge-${a.status}">${a.status}</span>
+    </div>`).join('')+'</div>';
+
+  // Expiring soon
+  const expiringEl=document.getElementById('dashExpiringList');
+  const expSoon=active.filter(s=>{const d=daysUntil(s.expiry);return d!==null&&d>=0&&d<=7;});
+  if(!expSoon.length){expiringEl.innerHTML='<div class="empty"><div class="empty-icon">✅</div><p>No riders expiring this week</p></div>';return;}
+  expiringEl.innerHTML='<div style="padding:.5rem 1rem">'+expSoon.map(s=>{
+    const d=daysUntil(s.expiry);
+    return`<div style="display:flex;align-items:center;gap:.75rem;padding:.6rem 0;border-bottom:1px solid var(--border)">
+      <span style="font-size:1.4rem">${vehicleIcon(s.type)}</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:.88rem">${esc(s.name)}</div>
+        <div style="font-size:.75rem;color:var(--muted)">${esc(s.phone||'—')} · Expires ${fmtDate(s.expiry)}</div>
+      </div>
+      <span class="badge badge-expiring">${d===0?'Today':d+'d'}</span>
+      <button class="btn btn-warn btn-sm" onclick="openRenewModal('${s.id}')">Renew</button>
+    </div>`;
+  }).join('')+'</div>';
+}
+
+// ══════════════════════════════════════════════════════
+//  APPLICATIONS
+// ══════════════════════════════════════════════════════
+function renderApplications(){
+  const search=(document.getElementById('appSearch')?.value||'').toLowerCase();
+  const fStatus=document.getElementById('appFilterStatus')?.value||'';
+  const fType=document.getElementById('appFilterType')?.value||'';
+  let apps=getSubs().filter(s=>s.isApplication||s.status==='pending');
+  if(search)apps=apps.filter(a=>(a.name+(a.phone||'')+(a.ref||'')).toLowerCase().includes(search));
+  if(fStatus)apps=apps.filter(a=>a.status===fStatus);
+  if(fType)apps=apps.filter(a=>a.type===fType);
+  apps=apps.slice().reverse();
+
+  const el=document.getElementById('appQueueList');
+  if(!apps.length){
+    el.innerHTML='<div class="empty"><div class="empty-icon">📋</div><p>No applications found</p><p style="font-size:.75rem;margin-top:.3rem">Applications submitted from the public MotoConnect directory appear here.</p></div>';
+    return;
+  }
+
+  el.innerHTML=apps.map(a=>{
+    const dateStr=a.created?new Date(a.created).toLocaleDateString('en-ZM',{day:'numeric',month:'short',year:'numeric'}):'—';
+    return`<div class="app-card ${a.status||'pending'}">
+      <div class="app-icon">${vehicleIcon(a.type)}</div>
+      <div class="app-info">
+        <div class="app-name">${esc(a.name)}</div>
+        <div class="app-meta">
+          📞 ${esc(a.phone||'—')} &nbsp;·&nbsp; ${esc(a.type||'—')} &nbsp;·&nbsp; Zone: ${esc(a.zone||'—')}<br>
+          Plan: <span class="pill-plan">${esc(a.plan||'Basic')}</span> &nbsp;·&nbsp; Applied: ${dateStr}
+          ${a.nrc?`<br>NRC: ${esc(a.nrc)}`:''}
+          ${a.area?`<br>Area: ${esc(a.area)}`:''}
+          ${a.notes?`<br><em>${esc(a.notes)}</em>`:''}
+        </div>
+        <span class="app-ref">${esc(a.ref||a.id)}</span>
+      </div>
+      <div class="app-actions">
+        ${a.status==='pending'?`
+          <button class="btn btn-success btn-sm" onclick="openApproveModal('${a.id}')">✅ Approve</button>
+          <button class="btn btn-danger btn-sm" onclick="rejectApp('${a.id}')">✗ Reject</button>
+        `:''}
+        ${a.status==='active'?`
+          <button class="btn btn-ghost btn-sm" onclick="showIdCard('${a.id}')">🆔 ID</button>
+          <button class="btn btn-warn btn-sm" onclick="openRenewModal('${a.id}')">🔄 Renew</button>
+          <span class="badge badge-active">Approved</span>
+        `:''}
+        ${a.status==='rejected'?`<span class="badge badge-rejected">Rejected</span>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openApproveModal(appId){
+  const a=getSubs().find(s=>s.id===appId);
+  if(!a)return;
+  document.getElementById('approveAppId').value=appId;
+  document.getElementById('approveStart').value=todayStr();
+  document.getElementById('approvePrice').value='';
+  document.getElementById('approveDuration').value='1';
+  document.getElementById('approveNotes').value=a.notes||'';
+  document.getElementById('approvePayMethod').value='';
+  document.getElementById('approveAmountPaid').value='';
+  if(a.plan){document.getElementById('approvePlan').value=a.plan;}
+  const infoEl=document.getElementById('approveRiderInfo');
+  if(infoEl)infoEl.innerHTML=`
+    <strong>${esc(a.name)}</strong> \u00b7 ${vehicleIcon(a.type)} ${esc(a.type||'')}<br>
+    <span style="color:var(--muted);font-size:.78rem">\u260e\ufe0f ${esc(a.phone||'\u2014')} &nbsp;\u00b7&nbsp; Zone: ${esc(a.zone||'\u2014')} &nbsp;\u00b7&nbsp; Ref: <code>${esc(a.ref||a.id)}</code></span>
+  `;
+  const msg=document.getElementById('approveMsg');
+  if(msg)msg.style.display='none';
+  const btn=document.getElementById('approveBtn');
+  if(btn){btn.disabled=false;btn.textContent='\u2705 Activate Rider';}
+  openModal('approveModal');
+}
+
+async function confirmApprove(){
+  const appId=document.getElementById('approveAppId').value;
+  const price=parseFloat(document.getElementById('approvePrice').value)||0;
+  const plan=document.getElementById('approvePlan').value;
+  const duration=document.getElementById('approveDuration').value;
+  const start=document.getElementById('approveStart').value||todayStr();
+  const notes=document.getElementById('approveNotes').value.trim();
+  const payMethod=document.getElementById('approvePayMethod').value;
+  const amountPaid=parseFloat(document.getElementById('approveAmountPaid').value)||0;
+  const showMsg=(t,cls)=>{const el=document.getElementById('approveMsg');if(el){el.textContent=t;el.className='alert '+cls;el.style.display='block';}};
+  if(!price){showMsg('Please set a monthly price.','alert-err');return;}
+  const subs=getSubs();
+  const i=subs.findIndex(s=>s.id===appId);
+  if(i<0)return;
+  const expDate=new Date(start);
+  expDate.setMonth(expDate.getMonth()+parseInt(duration));
+  const now=new Date().toISOString();
+  subs[i]={...subs[i],
+    status:'active',price,plan,duration,start,
+    expiry:toDateStr(expDate),
+    availability:'available',
+    notes:notes||subs[i].notes,
+    paymentMethod:payMethod||subs[i].paymentMethod||'',
+    amountPaid:amountPaid||subs[i].amountPaid||0,
+    paymentDate:todayStr(),
+    approvedAt:now,
+    activatedBy:state.adminName||'Admin'
+  };
+  // Save locally first
+  save(KEYS.subs,subs);
+  refreshAll();
+  // Disable button during Firebase write
+  const btn=document.getElementById('approveBtn');
+  if(btn){btn.disabled=true;btn.textContent='Saving...';}
+  showMsg('Saving to Firebase...','alert-info');
+  try{
+    await fbWriteItem(subs[i]);
+    closeModal('approveModal');
+    showFbMsg('\u2705 Rider activated and synced to Firebase!','alert-ok');
+  }catch(err){
+    if(btn){btn.disabled=false;btn.textContent='\u2705 Activate Rider';}
+    showMsg('\u26a0\ufe0f Saved locally. Firebase sync failed: '+err.message+'. Will retry when online.','alert-warn');
+    return; // keep modal open so admin can see the warning
+  }
+}
+
+function rejectApp(appId){
+  document.getElementById('confirmMsg').textContent='Reject this application? The rider will need to re-apply.';
+  document.getElementById('confirmOkBtn').textContent='Reject';
+  document.getElementById('confirmOkBtn').onclick=async()=>{
+    const subs=getSubs();
+    const i=subs.findIndex(s=>s.id===appId);
+    if(i>-1){subs[i]={...subs[i],status:'rejected',rejectedAt:new Date().toISOString()};}
+    save(KEYS.subs,subs);
+    try{await fbWriteItem(subs[i]);}catch(e){_pendingWrites.push({type:'item',item:subs[i]});}
+    closeModal('confirmModal');
+    refreshAll();
+  };
+  openModal('confirmModal');
+}
+
+// ══════════════════════════════════════════════════════
+//  SUBSCRIPTIONS TABLE
+// ══════════════════════════════════════════════════════
+function renderSubscriptions(){
+  const search=(document.getElementById('subSearch')?.value||'').toLowerCase();
+  const fStatus=document.getElementById('subFilterStatus')?.value||'';
+  const fPlan=document.getElementById('subFilterPlan')?.value||'';
+  let subs=getSubs().filter(s=>!s.isApplication||s.status!=='pending');
+  if(search)subs=subs.filter(s=>(s.name+s.phone).toLowerCase().includes(search));
+  if(fStatus)subs=subs.filter(s=>s.status===fStatus);
+  if(fPlan)subs=subs.filter(s=>s.plan===fPlan);
+  subs=subs.slice().reverse();
+
+  const tbody=document.getElementById('subTableBody');
+  if(!subs.length){
+    tbody.innerHTML='<tr><td colspan="9" class="empty">No subscriptions found</td></tr>';
+    return;
+  }
+  tbody.innerHTML=subs.map((s,i)=>{
+    const d=daysUntil(s.expiry);
+    let statusBadge=`<span class="badge badge-${s.status}">${s.status}</span>`;
+    if(s.status==='active'&&d!==null&&d<=state.warnDays&&d>=0)statusBadge=`<span class="badge badge-expiring">Expiring ${d===0?'today':'in '+d+'d'}</span>`;
+    return`<tr>
+      <td>${i+1}</td>
+      <td><strong>${esc(s.name)}</strong></td>
+      <td>${esc(s.phone||'—')}</td>
+      <td>${vehicleIcon(s.type)} ${esc(s.type||'—')}</td>
+      <td><span class="pill-plan">${esc(s.plan||'—')}</span></td>
+      <td>K${(s.price||0).toLocaleString()}</td>
+      <td>${fmtDate(s.expiry)}</td>
+      <td>${statusBadge}</td>
+      <td>
+        <div class="row-actions">
+          <button class="btn btn-ghost btn-sm" onclick="openEditSubModal('${s.id}')">✏️</button>
+          <button class="btn btn-warn btn-sm" onclick="openRenewModal('${s.id}')">🔄</button>
+          <button class="btn btn-ghost btn-sm" onclick="showIdCard('${s.id}')">🆔</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteSub('${s.id}')">🗑️</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function openAddSubModal(){
+  document.getElementById('subEditId').value='';
+  document.getElementById('subModalTitle').textContent='Add Rider';
+  ['subName','subPhone','subPrice','subNotes'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  document.getElementById('subStart').value=todayStr();
+  document.getElementById('subStatus').value='active';
+  openModal('subModal');
+}
+
+function openEditSubModal(id){
+  const s=getSubs().find(x=>x.id===id);
+  if(!s)return;
+  document.getElementById('subEditId').value=id;
+  document.getElementById('subModalTitle').textContent='Edit Rider';
+  document.getElementById('subName').value=s.name||'';
+  document.getElementById('subPhone').value=s.phone||'';
+  document.getElementById('subType').value=s.type||'Motorcycle Taxi';
+  document.getElementById('subPlan').value=s.plan||'Basic';
+  document.getElementById('subPrice').value=s.price||'';
+  document.getElementById('subStart').value=s.start||todayStr();
+  document.getElementById('subDuration').value=s.duration||'1';
+  document.getElementById('subStatus').value=s.status||'active';
+  document.getElementById('subNotes').value=s.notes||'';
+  openModal('subModal');
+}
+
+function saveSub(){
+  const editId=document.getElementById('subEditId').value;
+  const name=document.getElementById('subName').value.trim();
+  const phone=document.getElementById('subPhone').value.trim();
+  const type=document.getElementById('subType').value;
+  const plan=document.getElementById('subPlan').value;
+  const price=parseFloat(document.getElementById('subPrice').value)||0;
+  const start=document.getElementById('subStart').value||todayStr();
+  const duration=document.getElementById('subDuration').value;
+  const status=document.getElementById('subStatus').value;
+  const notes=document.getElementById('subNotes').value.trim();
+  if(!name){alert('Name is required.');return;}
+  const expDate=new Date(start);
+  expDate.setMonth(expDate.getMonth()+parseInt(duration));
+  const expiry=toDateStr(expDate);
+  const subs=getSubs();
+  if(editId){
+    const i=subs.findIndex(s=>s.id===editId);
+    if(i>-1)subs[i]={...subs[i],name,phone,type,plan,price,start,duration,expiry,status,notes};
+  }else{
+    subs.push({id:uid(),name,phone,type,plan,price,start,duration,expiry,status,notes,created:new Date().toISOString(),availability:'available'});
+  }
+  save(KEYS.subs,subs);
+  // Write only the changed item (or do full save for new additions)
+  const changedItem=editId?subs.find(s=>s.id===editId):subs[subs.length-1];
+  if(changedItem) fbWriteItem(changedItem).catch(()=>_pendingWrites.push({type:'item',item:changedItem}));
+  closeModal('subModal');
+  refreshAll();
+}
+
+function deleteSub(id){
+  document.getElementById('confirmMsg').textContent='Delete this rider? This cannot be undone.';
+  document.getElementById('confirmOkBtn').textContent='Delete';
+  document.getElementById('confirmOkBtn').onclick=async()=>{
+    const remaining=getSubs().filter(s=>s.id!==id);
+    try{ await fbSave(remaining); }catch(e){ /* queued internally */ }
+    closeModal('confirmModal');
+    refreshAll();
+  };
+  openModal('confirmModal');
+}
+
+// ══════════════════════════════════════════════════════
+//  RENEWALS
+// ══════════════════════════════════════════════════════
+function renderRenewals(){
+  const subs=getSubs();
+  const now=new Date();
+  const active=subs.filter(s=>s.status==='active');
+  const expiring=active.filter(s=>{const d=daysUntil(s.expiry);return d!==null&&d<=state.warnDays&&d>=0;});
+  const expired=subs.filter(s=>s.status==='expired'||(s.status==='active'&&daysUntil(s.expiry)<0));
+
+  const set=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
+  set('rStat7',expiring.length);
+  set('rStatExpired',expired.length);
+
+  const combined=[...expiring,...expired].sort((a,b)=>(daysUntil(a.expiry)||999)-(daysUntil(b.expiry)||999));
+  const el=document.getElementById('renewalList');
+  if(!combined.length){
+    el.innerHTML='<div class="empty"><div class="empty-icon">✅</div><p>No renewals due — all riders are current!</p></div>';
+    return;
+  }
+  el.innerHTML=combined.map(s=>{
+    const d=daysUntil(s.expiry);
+    const tag=d===null?'—':d<0?`<span class="badge badge-expired">Expired ${Math.abs(d)}d ago</span>`:d===0?'<span class="badge badge-expiring">Expires today</span>':`<span class="badge badge-expiring">Expires in ${d}d</span>`;
+    return`<div class="renewal-item">
+      <div class="renewal-info">
+        <div class="renewal-name">${vehicleIcon(s.type)} ${esc(s.name)}</div>
+        <div class="renewal-sub">${esc(s.phone||'—')} · <span class="pill-plan">${esc(s.plan||'—')}</span> · K${(s.price||0).toLocaleString()}/mo · Expiry: ${fmtDate(s.expiry)}</div>
+      </div>
+      ${tag}
+      <button class="btn btn-warn btn-sm" onclick="openRenewModal('${s.id}')">🔄 Renew</button>
+    </div>`;
+  }).join('');
+}
+
+function openRenewModal(id){
+  const s=getSubs().find(x=>x.id===id);
+  if(!s)return;
+  document.getElementById('renewSubId').value=id;
+  document.getElementById('renewPlan').value=s.plan||'Basic';
+  document.getElementById('renewPrice').value=s.price||'';
+  document.getElementById('renewStart').value=todayStr();
+  document.getElementById('renewDuration').value='1';
+  document.getElementById('renewPayMethod').value='';
+  document.getElementById('renewAmountPaid').value='';
+  document.getElementById('renewRiderInfo').innerHTML=`
+    <strong>${esc(s.name)}</strong> · ${vehicleIcon(s.type)} ${esc(s.type||'')}<br>
+    <span style="color:var(--muted);font-size:.8rem">Current expiry: ${fmtDate(s.expiry)} · Plan: ${esc(s.plan||'—')}</span>
+  `;
+  openModal('renewModal');
+}
+
+function confirmRenew(){
+  const id=document.getElementById('renewSubId').value;
+  const plan=document.getElementById('renewPlan').value;
+  const price=parseFloat(document.getElementById('renewPrice').value)||0;
+  const start=document.getElementById('renewStart').value||todayStr();
+  const duration=parseInt(document.getElementById('renewDuration').value)||1;
+  const payMethod=document.getElementById('renewPayMethod').value;
+  const amountPaid=parseFloat(document.getElementById('renewAmountPaid').value)||0;
+  if(!price){alert('Please enter a monthly price.');return;}
+  const subs=getSubs();
+  const i=subs.findIndex(s=>s.id===id);
+  if(i<0)return;
+  const expDate=new Date(start);
+  expDate.setMonth(expDate.getMonth()+duration);
+  subs[i]={...subs[i],status:'active',plan,price,start,duration:String(duration),expiry:toDateStr(expDate),
+    paymentMethod:payMethod||subs[i].paymentMethod,amountPaid:amountPaid||subs[i].amountPaid,
+    paymentDate:todayStr(),renewedAt:new Date().toISOString()};
+  save(KEYS.subs,subs);
+  fbWriteItem(subs[i]).catch(e=>{
+    _pendingWrites.push({type:'item',item:subs[i]});
+    showFbMsg('⚠️ Renewed locally. Firebase sync will retry when online.','alert-warn');
+  });
+  closeModal('renewModal');
+  refreshAll();
+  showFbMsg('✅ Subscription renewed until '+fmtDate(toDateStr(expDate)),'alert-ok');
+}
+
+// ══════════════════════════════════════════════════════
+//  ID CARD
+// ══════════════════════════════════════════════════════
+function showIdCard(id){
+  const s=getSubs().find(x=>x.id===id);
+  if(!s)return;
+  const d=daysUntil(s.expiry);
+  const statusColor=s.status==='active'&&d!==null&&d>=0?'#10b981':'#dc2626';
+  document.getElementById('idCardBody').innerHTML=`
+    <div class="id-card">
+      <div class="id-card-logo">🏍️ MotoConnect Mansa</div>
+      <div class="id-card-avatar">${(s.name||'?').charAt(0).toUpperCase()}</div>
+      <div class="id-card-name">${esc(s.name)}</div>
+      <div class="id-card-type">${vehicleIcon(s.type)} ${esc(s.type||'Rider')}</div>
+      <div class="id-card-divider"></div>
+      <div class="id-card-row"><span>Plan</span><strong>${esc(s.plan||'—')}</strong></div>
+      <div class="id-card-row"><span>Phone</span><strong>${esc(s.phone||'—')}</strong></div>
+      <div class="id-card-row"><span>Zone</span><strong>${esc(s.zone||'—')}</strong></div>
+      <div class="id-card-row"><span>Valid Until</span><strong style="color:${statusColor}">${fmtDate(s.expiry)}</strong></div>
+      <div class="id-card-row"><span>Ref</span><strong style="font-family:monospace;font-size:.7rem">${esc(s.ref||s.id)}</strong></div>
+      <div class="id-card-footer">Issued by MotoConnect Mansa · ${new Date().getFullYear()}</div>
+    </div>
+  `;
+  openModal('idCardModal');
+}
+
+// ══════════════════════════════════════════════════════
+//  SETTINGS
+// ══════════════════════════════════════════════════════
+function loadSettings(){
+  const s=getSettings();
+  state.adminName=s.adminName||'Admin';
+  state.warnDays=s.warnDays||7;
+  const el=document.getElementById('sidebarName');
+  if(el)el.textContent=state.adminName;
+  const av=document.getElementById('sidebarAvatar');
+  if(av)av.textContent=state.adminName.charAt(0).toUpperCase();
+}
+
+function loadSettingsPage(){
+  loadSettings();
+  const n=document.getElementById('settingName');
+  if(n)n.value=state.adminName;
+  const w=document.getElementById('settingWarnDays');
+  if(w)w.value=state.warnDays;
+  const cfg=getSavedFbConfig();
+  const inp=document.getElementById('fbConfigInput');
+  if(cfg&&inp)inp.value=JSON.stringify(cfg,null,2);
+}
+
+function saveAdminName(){
+  const name=document.getElementById('settingName').value.trim();
+  if(!name){alert('Please enter a name.');return;}
+  const s=getSettings();
+  s.adminName=name;
+  save(KEYS.settings,s);
+  loadSettings();
+  alert('Name saved.');
+}
+
+function saveWarnDays(){
+  const days=parseInt(document.getElementById('settingWarnDays').value)||7;
+  const s=getSettings();
+  s.warnDays=days;
+  save(KEYS.settings,s);
+  state.warnDays=days;
+  alert('Warning window saved.');
+}
+
+function changePassword(){
+  const cur=document.getElementById('curPw').value;
+  const nw=document.getElementById('newPw').value;
+  const conf=document.getElementById('confPw').value;
+  const msg=document.getElementById('pwMsg');
+  const show=(t,cls)=>{msg.textContent=t;msg.className='alert '+cls;msg.style.display='block';setTimeout(()=>msg.style.display='none',4000);};
+  if(cur!==getPassword()){show('Current password is incorrect.','alert-err');return;}
+  if(nw.length<6){show('New password must be at least 6 characters.','alert-err');return;}
+  if(nw!==conf){show('Passwords do not match.','alert-err');return;}
+  save(KEYS.pw,nw);
+  show('Password updated successfully.','alert-ok');
+  ['curPw','newPw','confPw'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+}
+
+function clearAllData(){
+  if(!confirm('Clear all local subscription data? Firebase data is not affected.'))return;
+  localStorage.removeItem(KEYS.subs);
+  refreshAll();
+  alert('Local data cleared.');
+}
+
+// ══════════════════════════════════════════════════════
+//  BOOT
+// ══════════════════════════════════════════════════════
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){document.querySelectorAll('.overlay.open').forEach(m=>m.classList.remove('open'));}});
+
+// Detect content:// or file:// — Firebase SDKs need https://
+(function(){
+  const isLocal=(location.protocol==='file:'||location.href.startsWith('content://'));
+  if(isLocal){
+    window.addEventListener('DOMContentLoaded',()=>{
+      const warn=document.getElementById('localFileWarn');
+      if(warn)warn.style.display='block';
+    });
+  }
+})();
+
+// Auto-reconnect Firebase on load (only when served over http/https)
+(function(){
+  const isHosted=location.protocol==='https:'||location.protocol==='http:';
+  if(!isHosted)return;
+  const cfg=getSavedFbConfig();
+  if(cfg){
+    window.addEventListener('DOMContentLoaded',()=>{
+      setTimeout(()=>{
+        const inp=document.getElementById('fbConfigInput');
+        if(inp)inp.value=JSON.stringify(cfg,null,2);
+        connectFirebase(JSON.stringify(cfg));
+      },300);
+    });
+  }
+})();
+</script>
+</body>
+</html>

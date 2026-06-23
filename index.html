@@ -565,6 +565,24 @@
       </div>
 
       <div class="settings-card">
+        <h3>🗺️ Operating Regions</h3>
+        <p style="font-size:.82rem;color:var(--muted);margin-bottom:.9rem">These regions appear in the rider application form as selectable zones. You can also accept custom regions submitted by riders during approval.</p>
+        <div id="zoneManagerList" style="margin-bottom:.9rem"></div>
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:flex-end">
+          <div style="flex:1;min-width:160px">
+            <label style="font-size:.72rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:.3rem">Region Name</label>
+            <input type="text" id="newZoneName" placeholder="e.g. Mansa South" style="width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;padding:.55rem .8rem;color:var(--text);font-size:.88rem;outline:none"/>
+          </div>
+          <div style="flex:1;min-width:140px">
+            <label style="font-size:.72rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:.3rem">Description (optional)</label>
+            <input type="text" id="newZoneDesc" placeholder="e.g. Southern suburbs" style="width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;padding:.55rem .8rem;color:var(--text);font-size:.88rem;outline:none"/>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="adminAddZone()" style="flex-shrink:0;height:36px">+ Add Region</button>
+        </div>
+        <div id="zoneSettingsMsg" style="display:none;margin-top:.6rem" class="alert"></div>
+      </div>
+
+      <div class="settings-card">
         <h3>💬 Zone WhatsApp Group Links</h3>
         <p style="font-size:.82rem;color:var(--muted);margin-bottom:.9rem">Set a WhatsApp group invite link for each zone. Customers will see a "Join Group" button on the public directory.</p>
         <div id="zoneWaGroupList"></div>
@@ -590,20 +608,24 @@
       <button class="close-btn" onclick="closeModal('approveModal')">✕</button>
     </div>
     <div class="modal-body">
-      <div id="approveRiderInfo" style="background:var(--surface2);border-radius:8px;padding:.75rem;margin-bottom:1rem;font-size:.85rem"></div>
+      <!-- Full application summary from rider -->
+      <div id="approveRiderInfo" style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:.85rem 1rem;margin-bottom:1rem;font-size:.84rem;line-height:1.8"></div>
       <input type="hidden" id="approveAppId"/>
+
+      <!-- Subscription terms: plan + duration are pre-filled from rider; price auto-derives -->
+      <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:.5rem">Subscription Terms</div>
       <div class="form-grid">
         <div class="form-row">
-          <label>Plan</label>
-          <select id="approvePlan">
-            <option>Basic</option>
-            <option>Standard</option>
-            <option>Premium</option>
+          <label>Plan <span style="font-weight:400;font-size:.72rem;color:var(--accent)">(from rider)</span></label>
+          <select id="approvePlan" onchange="onApprovePlanChange()">
+            <option value="Basic">Basic — K50/mo</option>
+            <option value="Standard">Standard — K100/mo</option>
+            <option value="Premium">Premium — K200/mo</option>
           </select>
         </div>
         <div class="form-row">
           <label>Monthly Price (ZMW)</label>
-          <input type="number" id="approvePrice" placeholder="e.g. 150" min="0"/>
+          <input type="number" id="approvePrice" min="0" placeholder="Auto-set from plan"/>
         </div>
         <div class="form-row">
           <label>Start Date</label>
@@ -629,12 +651,21 @@
         </div>
         <div class="form-row">
           <label>Amount Paid (ZMW)</label>
-          <input type="number" id="approveAmountPaid" placeholder="e.g. 150" min="0"/>
+          <input type="number" id="approveAmountPaid" min="0" placeholder="Auto-set from plan"/>
         </div>
       </div>
+      <!-- Custom zone notice — shown only when rider submitted a non-standard zone -->
+      <div id="customZoneRow" style="display:none;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:.75rem .9rem;margin-bottom:.75rem;font-size:.83rem">
+        <div style="font-weight:700;color:#92400e;margin-bottom:.4rem">⚠️ Custom region submitted by rider</div>
+        <div style="color:#78350f;margin-bottom:.6rem">Primary: <strong id="customZoneLabel1">—</strong><span id="customZoneLabel2Wrap"> &nbsp;·&nbsp; Secondary: <strong id="customZoneLabel2">—</strong></span></div>
+        <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;color:#92400e;font-weight:600">
+          <input type="checkbox" id="acceptCustomZone" onchange="onAcceptCustomZone()" style="width:15px;height:15px;accent-color:var(--accent2)"/>
+          Accept &amp; add to regions list permanently
+        </label>
+      </div>
       <div class="form-row">
-        <label>Notes (optional)</label>
-        <textarea id="approveNotes" rows="2" placeholder="Any notes for this rider…"></textarea>
+        <label>Admin Notes (optional)</label>
+        <textarea id="approveNotes" rows="2" placeholder="Internal notes…"></textarea>
       </div>
       <div id="approveMsg" style="display:none;margin-top:.5rem"></div>
     </div>
@@ -1247,6 +1278,8 @@ function renderApplications(){
         <div class="app-meta">
           📞 ${esc(a.phone||'—')} &nbsp;·&nbsp; ${esc(a.type||'—')} &nbsp;·&nbsp; Zone: ${esc(a.zone||'—')}<br>
           Plan: <span class="pill-plan">${esc(a.plan||'Basic')}</span> &nbsp;·&nbsp; Applied: ${dateStr}
+          ${a.zoneCustom?`<br>📍 Custom region: <strong style="color:var(--warn)">${esc(a.zoneCustom)}</strong> <span style="font-size:.68rem;background:#fff7ed;border:1px solid #fcd34d;color:#92400e;padding:.1rem .35rem;border-radius:4px;font-weight:700">UNRECOGNISED</span>`:''}
+          ${a.zone2Custom?`<br>📍 Custom region 2: <strong style="color:var(--warn)">${esc(a.zone2Custom)}</strong> <span style="font-size:.68rem;background:#fff7ed;border:1px solid #fcd34d;color:#92400e;padding:.1rem .35rem;border-radius:4px;font-weight:700">UNRECOGNISED</span>`:''}
           ${a.nrc?`<br>NRC: ${esc(a.nrc)}`:''}
           ${a.area?`<br>Area: ${esc(a.area)}`:''}
           ${a.notes?`<br><em>${esc(a.notes)}</em>`:''}
@@ -1269,26 +1302,88 @@ function renderApplications(){
   }).join('');
 }
 
+const PLAN_PRICES={Basic:50,Standard:100,Premium:200};
+
+function onApprovePlanChange(){
+  const plan=document.getElementById('approvePlan').value;
+  const price=PLAN_PRICES[plan]||0;
+  document.getElementById('approvePrice').value=price;
+  document.getElementById('approveAmountPaid').value=price;
+}
+
 function openApproveModal(appId){
   const a=getSubs().find(s=>s.id===appId);
   if(!a)return;
+
+  // Hidden id
   document.getElementById('approveAppId').value=appId;
+
+  // Pre-fill plan from rider's choice
+  const plan=a.plan||'Basic';
+  document.getElementById('approvePlan').value=plan;
+
+  // Auto-derive price from plan
+  const price=PLAN_PRICES[plan]||0;
+  document.getElementById('approvePrice').value=price;
+
+  // Start date = today
   document.getElementById('approveStart').value=todayStr();
-  document.getElementById('approvePrice').value='';
+
+  // Duration default 1 month
   document.getElementById('approveDuration').value='1';
+
+  // Payment method: default Mobile Money if txnId present, else Cash
+  document.getElementById('approvePayMethod').value=a.txnId?'Mobile Money':'Cash';
+
+  // Amount paid = plan price (rider should have paid this)
+  document.getElementById('approveAmountPaid').value=price;
+
+  // Admin notes: pre-fill with rider's notes if any
   document.getElementById('approveNotes').value=a.notes||'';
-  document.getElementById('approvePayMethod').value='';
-  document.getElementById('approveAmountPaid').value='';
-  if(a.plan){document.getElementById('approvePlan').value=a.plan;}
+
+  // Build comprehensive rider info summary
   const infoEl=document.getElementById('approveRiderInfo');
-  if(infoEl)infoEl.innerHTML=`
-    <strong>${esc(a.name)}</strong> \u00b7 ${vehicleIcon(a.type)} ${esc(a.type||'')}<br>
-    <span style="color:var(--muted);font-size:.78rem">\u260e\ufe0f ${esc(a.phone||'\u2014')} &nbsp;\u00b7&nbsp; Zone: ${esc(a.zone||'\u2014')} &nbsp;\u00b7&nbsp; Ref: <code>${esc(a.ref||a.id)}</code></span>
-  `;
+  if(infoEl){
+    const rows=[
+      ['Name',`<strong>${esc(a.name)}</strong>`],
+      ['Phone',`<a href="tel:+260${esc(a.phone||'')}" style="color:var(--accent)">${esc(a.phone||'—')}</a>`],
+      ['Vehicle',`${vehicleIcon(a.type)} ${esc(a.type||'—')}`],
+      ['Zone',esc(a.zone||'—')+(a.zone2?` <span style="color:var(--muted)">+ ${esc(a.zone2)}</span>`:'')],
+      ['Plan',`<span class="pill-plan">${esc(plan)}</span> <span style="color:var(--accent);font-weight:700">K${price}/mo</span>`],
+    ];
+    if(a.hours)rows.push(['Hours',esc(a.hours)]);
+    if(a.nrc)rows.push(['NRC',esc(a.nrc)]);
+    if(a.area)rows.push(['Area',esc(a.area)]);
+    if(a.txnId)rows.push(['💳 Txn ID',`<code style="background:#d1fae5;color:#065f46;padding:.1rem .4rem;border-radius:4px;font-size:.82rem">${esc(a.txnId)}</code>`]);
+    if(a.notes)rows.push(['Notes',`<em style="color:var(--muted)">${esc(a.notes)}</em>`]);
+    rows.push(['Ref',`<code style="font-size:.78rem">${esc(a.ref||a.id)}</code>`]);
+    rows.push(['Applied',a.created?new Date(a.created).toLocaleDateString('en-ZM',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'—']);
+    infoEl.innerHTML=rows.map(([l,v])=>`<div style="display:flex;gap:.5rem"><span style="color:var(--muted);min-width:70px;flex-shrink:0">${l}</span><span>${v}</span></div>`).join('');
+  }
+
+  // Custom zone handling
+  const hasCustom=!!(a.zoneCustom||a.zone2Custom);
+  const customRow=document.getElementById('customZoneRow');
+  if(customRow){
+    customRow.style.display=hasCustom?'block':'none';
+    if(hasCustom){
+      const el1=document.getElementById('customZoneLabel1');
+      const el2=document.getElementById('customZoneLabel2');
+      const el2wrap=document.getElementById('customZoneLabel2Wrap');
+      if(el1)el1.textContent=a.zoneCustom||a.zone||'—';
+      if(el2&&el2wrap){
+        if(a.zone2Custom){el2.textContent=a.zone2Custom;el2wrap.style.display='';}
+        else el2wrap.style.display='none';
+      }
+      const cb=document.getElementById('acceptCustomZone');
+      if(cb)cb.checked=false;
+    }
+  }
+
   const msg=document.getElementById('approveMsg');
   if(msg)msg.style.display='none';
   const btn=document.getElementById('approveBtn');
-  if(btn){btn.disabled=false;btn.textContent='\u2705 Activate Rider';}
+  if(btn){btn.disabled=false;btn.textContent='✅ Activate Rider';}
   openModal('approveModal');
 }
 
@@ -1302,7 +1397,12 @@ async function confirmApprove(){
   const payMethod=document.getElementById('approvePayMethod').value;
   const amountPaid=parseFloat(document.getElementById('approveAmountPaid').value)||0;
   const showMsg=(t,cls)=>{const el=document.getElementById('approveMsg');if(el){el.textContent=t;el.className='alert '+cls;el.style.display='block';}};
-  if(!price){showMsg('Please set a monthly price.','alert-err');return;}
+  if(!price){
+    // Fall back to plan default if somehow blank
+    const planDefault=PLAN_PRICES[plan]||0;
+    if(planDefault){document.getElementById('approvePrice').value=planDefault;}
+    else{showMsg('Monthly price is required.','alert-err');return;}
+  }
   const subs=getSubs();
   const i=subs.findIndex(s=>s.id===appId);
   if(i<0)return;
@@ -1320,6 +1420,22 @@ async function confirmApprove(){
     approvedAt:now,
     activatedBy:state.adminName||'Admin'
   };
+  // If admin accepted rider custom zone(s), permanently add them to zones list
+  const acceptCustom=document.getElementById('acceptCustomZone')?.checked;
+  if(acceptCustom){
+    const zones=getZones();
+    const existing=new Set(zones.map(z=>z.name.toLowerCase()));
+    const app=subs[i];
+    [app.zoneCustom,app.zone2Custom].filter(Boolean).forEach(name=>{
+      if(!existing.has(name.toLowerCase())){
+        zones.push({id:uid(),name,desc:'Added from rider application',mult:1.0});
+        existing.add(name.toLowerCase());
+      }
+    });
+    save(KEYS.zones,zones);
+    renderZoneManager();
+    renderZoneWaGroupList();
+  }
   // Save locally first
   save(KEYS.subs,subs);
   refreshAll();
@@ -1351,6 +1467,50 @@ function rejectApp(appId){
     refreshAll();
   };
   openModal('confirmModal');
+}
+
+// ══════════════════════════════════════════════════════
+//  ZONE MANAGER (Settings)
+// ══════════════════════════════════════════════════════
+function renderZoneManager(){
+  const zones=getZones();
+  const el=document.getElementById('zoneManagerList');
+  if(!el)return;
+  if(!zones.length){el.innerHTML='<div class="text-muted" style="font-size:.82rem">No regions defined yet.</div>';return;}
+  el.innerHTML=zones.map(z=>`
+    <div style="display:flex;align-items:center;gap:.6rem;padding:.45rem .6rem;border-radius:8px;background:var(--surface2);border:1px solid var(--border);margin-bottom:.4rem">
+      <span style="font-size:.85rem;flex:1;font-weight:600;color:var(--text)">${esc(z.name)}</span>
+      ${z.desc?'<span style="font-size:.75rem;color:var(--muted);flex:1">'+esc(z.desc)+'</span>':''}
+      <button class="btn btn-danger btn-sm" style="padding:.25rem .55rem;font-size:.72rem" onclick="adminDeleteZone('${z.id}')">✕</button>
+    </div>`).join('');
+}
+
+function adminAddZone(){
+  const name=document.getElementById('newZoneName').value.trim();
+  const desc=document.getElementById('newZoneDesc').value.trim();
+  const msgEl=document.getElementById('zoneSettingsMsg');
+  const show=(t,cls)=>{msgEl.textContent=t;msgEl.className='alert '+cls;msgEl.style.display='block';setTimeout(()=>msgEl.style.display='none',3500);};
+  if(!name){show('Please enter a region name.','alert-err');return;}
+  const zones=getZones();
+  if(zones.some(z=>z.name.toLowerCase()===name.toLowerCase())){show('That region already exists.','alert-warn');return;}
+  zones.push({id:uid(),name,desc,mult:1.0});
+  save(KEYS.zones,zones);
+  document.getElementById('newZoneName').value='';
+  document.getElementById('newZoneDesc').value='';
+  renderZoneManager();
+  renderZoneWaGroupList();
+  show('✅ Region "'+name+'" added.','alert-ok');
+}
+
+function adminDeleteZone(zoneId){
+  if(!confirm('Remove this region? Riders already assigned to it keep their zone name.'))return;
+  save(KEYS.zones,getZones().filter(z=>z.id!==zoneId));
+  renderZoneManager();
+  renderZoneWaGroupList();
+}
+
+function onAcceptCustomZone(){
+  // Feedback only — actual zone addition happens in confirmApprove
 }
 
 // ══════════════════════════════════════════════════════
@@ -1588,6 +1748,20 @@ function loadSettings(){
   if(av)av.textContent=state.adminName.charAt(0).toUpperCase();
 }
 
+function renderZoneWaGroupList(){
+  const zoneList=document.getElementById('zoneWaGroupList');
+  if(!zoneList)return;
+  const zones=getZones();
+  zoneList.innerHTML=zones.map(z=>`
+    <div style="margin-bottom:.75rem">
+      <label style="font-size:.78rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:.3rem">${esc(z.name)}</label>
+      <div style="display:flex;gap:.5rem">
+        <input type="url" id="waGroup_${z.id}" placeholder="https://chat.whatsapp.com/..." value="${esc(z.waGroup||'')}" style="flex:1;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;padding:.55rem .8rem;color:var(--text);font-size:.85rem;outline:none"/>
+        <button class="btn btn-success btn-sm" onclick="saveZoneWaGroupInput('${z.id}')">Save</button>
+      </div>
+    </div>`).join('');
+}
+
 function loadSettingsPage(){
   loadSettings();
   const n=document.getElementById('settingName');
@@ -1597,19 +1771,8 @@ function loadSettingsPage(){
   const cfg=getSavedFbConfig();
   const inp=document.getElementById('fbConfigInput');
   if(cfg&&inp)inp.value=JSON.stringify(cfg,null,2);
-  // Render zone WA group link inputs
-  const zoneList=document.getElementById('zoneWaGroupList');
-  if(zoneList){
-    const zones=getZones();
-    zoneList.innerHTML=zones.map(z=>`
-      <div style="margin-bottom:.75rem">
-        <label style="font-size:.78rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:.3rem">${esc(z.name)}</label>
-        <div style="display:flex;gap:.5rem">
-          <input type="url" id="waGroup_${z.id}" placeholder="https://chat.whatsapp.com/..." value="${esc(z.waGroup||'')}" style="flex:1;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;padding:.55rem .8rem;color:var(--text);font-size:.85rem;outline:none"/>
-          <button class="btn btn-success btn-sm" onclick="saveZoneWaGroupInput('${z.id}')">Save</button>
-        </div>
-      </div>`).join('');
-  }
+  renderZoneManager();
+  renderZoneWaGroupList();
 }
 function saveZoneWaGroupInput(zoneId){
   const inp=document.getElementById('waGroup_'+zoneId);

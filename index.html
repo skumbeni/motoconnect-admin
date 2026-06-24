@@ -927,8 +927,13 @@ async function connectFirebase(configStr){
     cfg=cfg.replace(/^[\s\S]*?({)/,'$1').replace(/;?\s*$/,'');
     const parsed=JSON.parse(cfg);
     if(!parsed.databaseURL){showFbMsg('databaseURL is required.','alert-err');return;}
-    if(_fbApp){try{_fbApp.delete();}catch(e){}_listenerAttached=false;}
-    _fbApp=firebase.initializeApp(parsed,'mca-'+Date.now());
+    // Use a fixed app name so re-connects cleanly replace the previous
+    // instance rather than leaking a new one on every call.
+    const _FB_APP_NAME='motoconnect-admin';
+    const existing=firebase.apps.find(a=>a.name===_FB_APP_NAME);
+    if(existing){try{await existing.delete();}catch(e){}}
+    _listenerAttached=false;
+    _fbApp=firebase.initializeApp(parsed,_FB_APP_NAME);
     _fbAuth=firebase.auth(_fbApp);
     _fbDb=firebase.database(_fbApp);
     // Sign in anonymously so Firebase Auth rules (auth != null) are satisfied

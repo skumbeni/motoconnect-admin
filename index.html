@@ -447,7 +447,7 @@
               </tr>
             </thead>
             <tbody id="subTableBody">
-              <tr><td colspan="11" class="empty">No subscriptions yet</td></tr>
+              <tr><td colspan="9" class="empty">No subscriptions yet</td></tr>
             </tbody>
           </table>
         </div>
@@ -568,11 +568,7 @@
       <div class="settings-card">
         <h3>🗺️ Operating Regions</h3>
         <p style="font-size:.82rem;color:var(--muted);margin-bottom:.9rem">These regions appear in the rider application form as selectable zones. You can also accept custom regions submitted by riders during approval.</p>
-        <div style="margin-bottom:.6rem">
-          <input type="text" id="zoneSearch" placeholder="🔍 Search regions…" oninput="renderZoneManager()" style="width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;padding:.5rem .8rem;color:var(--text);font-size:.85rem;outline:none"/>
-          <div id="zoneSearchCount" style="font-size:.74rem;color:var(--muted);margin-top:.3rem"></div>
-        </div>
-        <div id="zoneManagerList" style="margin-bottom:.9rem;max-height:320px;overflow-y:auto"></div>
+        <div id="zoneManagerList" style="margin-bottom:.9rem"></div>
         <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:flex-end">
           <div style="flex:1;min-width:160px">
             <label style="font-size:.72rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:.3rem">Region Name</label>
@@ -647,7 +643,7 @@
         </div>
         <div class="form-row">
           <label>Payment Method</label>
-          <select id="approvePayMethod" onchange="onApprovePayMethodChange()">
+          <select id="approvePayMethod">
             <option value="">— Select —</option>
             <option>Cash</option>
             <option>Mobile Money</option>
@@ -658,12 +654,6 @@
           <label>Amount Paid (ZMW)</label>
           <input type="number" id="approveAmountPaid" min="0" placeholder="Auto-set from plan"/>
         </div>
-      </div>
-      <!-- Transaction ID — mandatory for Mobile Money -->
-      <div class="form-row" id="txnIdRow">
-        <label>Transaction ID <span id="txnIdRequired" style="color:var(--danger);font-weight:700;display:none">*</span> <span id="txnIdOptional" style="font-weight:400;font-size:.72rem;color:var(--muted)">(optional)</span></label>
-        <input type="text" id="approveTxnId" placeholder="e.g. MP250624XXXXX" autocomplete="off" style="font-family:monospace"/>
-        <div id="txnIdHint" style="display:none;font-size:.74rem;color:var(--danger);margin-top:.3rem">⚠️ Transaction ID is required for Mobile Money payments.</div>
       </div>
       <!-- Custom zone notice — shown only when rider submitted a non-standard zone -->
       <div id="customZoneRow" style="display:none;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:.75rem .9rem;margin-bottom:.75rem;font-size:.83rem">
@@ -762,10 +752,6 @@
         <div class="form-row">
           <label>Phone *</label>
           <input type="tel" id="subPhone" placeholder="e.g. 0977 123456"/>
-        </div>
-        <div class="form-row">
-          <label>Phone 2 <span style="font-weight:400;font-size:.72rem;color:var(--muted)">(optional)</span></label>
-          <input type="tel" id="subPhone2" placeholder="e.g. 0966 654321"/>
         </div>
         <div class="form-row">
           <label>Vehicle Type</label>
@@ -1762,9 +1748,8 @@ function renderApplications(){
       <div class="app-info">
         <div class="app-name">${esc(a.name)}</div>
         <div class="app-meta">
-          📞 ${esc(a.phone||'—')}${a.phone2?` &nbsp;·&nbsp; 📞 <span style="color:var(--muted);font-size:.75rem">${esc(a.phone2)}</span>`:''} &nbsp;·&nbsp; ${esc(a.type||'—')} &nbsp;·&nbsp; Zone: ${esc(a.zone||'—')}<br>
+          📞 ${esc(a.phone||'—')} &nbsp;·&nbsp; ${esc(a.type||'—')} &nbsp;·&nbsp; Zone: ${esc(a.zone||'—')}<br>
           Plan: <span class="pill-plan">${esc(a.plan||'Basic')}</span> &nbsp;·&nbsp; Applied: ${dateStr}
-          ${a.txnId?`<br>💳 Txn ID: <code style="background:#d1fae5;color:#065f46;padding:.1rem .35rem;border-radius:4px;font-size:.75rem;font-family:monospace">${esc(a.txnId)}</code>`:''}
           ${a.zoneCustom?`<br>📍 Custom region: <strong style="color:var(--warn)">${esc(a.zoneCustom)}</strong> <span style="font-size:.68rem;background:#fff7ed;border:1px solid #fcd34d;color:#92400e;padding:.1rem .35rem;border-radius:4px;font-weight:700">UNRECOGNISED</span>`:''}
           ${a.zone2Custom?`<br>📍 Custom region 2: <strong style="color:var(--warn)">${esc(a.zone2Custom)}</strong> <span style="font-size:.68rem;background:#fff7ed;border:1px solid #fcd34d;color:#92400e;padding:.1rem .35rem;border-radius:4px;font-weight:700">UNRECOGNISED</span>`:''}
           ${a.nrc?`<br>NRC: ${esc(a.nrc)}`:''}
@@ -1798,17 +1783,6 @@ function onApprovePlanChange(){
   document.getElementById('approveAmountPaid').value=price;
 }
 
-function onApprovePayMethodChange(){
-  const method=document.getElementById('approvePayMethod').value;
-  const isMoMo=method==='Mobile Money';
-  const req=document.getElementById('txnIdRequired');
-  const opt=document.getElementById('txnIdOptional');
-  const hint=document.getElementById('txnIdHint');
-  if(req)req.style.display=isMoMo?'':'none';
-  if(opt)opt.style.display=isMoMo?'none':'';
-  if(hint)hint.style.display='none'; // reset hint on method change
-}
-
 function openApproveModal(appId){
   const a=getSubs().find(s=>s.id===appId);
   if(!a)return;
@@ -1833,10 +1807,6 @@ function openApproveModal(appId){
   // Payment method: default Mobile Money if txnId present, else Cash
   document.getElementById('approvePayMethod').value=a.txnId?'Mobile Money':'Cash';
 
-  // Pre-fill txnId from rider's submission if present
-  document.getElementById('approveTxnId').value=a.txnId||'';
-  onApprovePayMethodChange();
-
   // Amount paid = plan price (rider should have paid this)
   document.getElementById('approveAmountPaid').value=price;
 
@@ -1849,7 +1819,6 @@ function openApproveModal(appId){
     const rows=[
       ['Name',`<strong>${esc(a.name)}</strong>`],
       ['Phone',`<a href="tel:+260${esc(a.phone||'')}" style="color:var(--accent)">${esc(a.phone||'—')}</a>`],
-      ...(a.phone2?[['Phone 2',`<a href="tel:+260${esc(a.phone2)}" style="color:var(--accent)">${esc(a.phone2)}</a>`]]:[]),
       ['Vehicle',`${vehicleIcon(a.type)} ${esc(a.type||'—')}`],
       ['Zone',esc(a.zone||'—')+(a.zone2?` <span style="color:var(--muted)">+ ${esc(a.zone2)}</span>`:'')],
       ['Plan',`<span class="pill-plan">${esc(plan)}</span> <span style="color:var(--accent);font-weight:700">K${price}/mo</span>`],
@@ -1903,19 +1872,7 @@ async function confirmApprove(){
   const notes=document.getElementById('approveNotes').value.trim();
   const payMethod=document.getElementById('approvePayMethod').value;
   const amountPaid=parseFloat(document.getElementById('approveAmountPaid').value)||0;
-  const txnId=document.getElementById('approveTxnId').value.trim();
   const showMsg=(t,cls)=>{const el=document.getElementById('approveMsg');if(el){el.textContent=t;el.className='alert '+cls;el.style.display='block';}};
-  // Enforce txnId for Mobile Money
-  if(payMethod==='Mobile Money'&&!txnId){
-    const hint=document.getElementById('txnIdHint');
-    if(hint)hint.style.display='block';
-    showMsg('Transaction ID is required for Mobile Money payments.','alert-err');
-    return;
-  }
-  if(!payMethod){
-    showMsg('Please select a payment method.','alert-err');
-    return;
-  }
   if(!price){
     // Fall back to plan default if somehow blank
     const planDefault=PLAN_PRICES[plan]||0;
@@ -1935,7 +1892,6 @@ async function confirmApprove(){
     notes:notes||subs[i].notes,
     paymentMethod:payMethod||subs[i].paymentMethod||'',
     amountPaid:amountPaid||subs[i].amountPaid||0,
-    txnId:txnId||subs[i].txnId||'',
     paymentDate:todayStr(),
     approvedAt:now,
     activatedBy:state.adminName||'Admin'
@@ -1993,25 +1949,11 @@ function rejectApp(appId){
 //  ZONE MANAGER (Settings)
 // ══════════════════════════════════════════════════════
 function renderZoneManager(){
-  const allZones=getZones();
+  const zones=getZones();
   const el=document.getElementById('zoneManagerList');
-  const countEl=document.getElementById('zoneSearchCount');
   if(!el)return;
-  if(!allZones.length){el.innerHTML='<div class="text-muted" style="font-size:.82rem">No regions defined yet.</div>';return;}
-  const q=(document.getElementById('zoneSearch')?.value||'').toLowerCase().trim();
-  const filtered=q?allZones.filter(z=>z.name.toLowerCase().includes(q)):allZones;
-  const LIMIT=50;
-  const shown=filtered.slice(0,LIMIT);
-  if(countEl){
-    if(q){
-      countEl.textContent=filtered.length===0?'No regions match your search.':
-        `Showing ${shown.length} of ${filtered.length} matching region${filtered.length!==1?'s':''} (${allZones.length} total)`;
-    } else {
-      countEl.textContent=`Showing ${shown.length} of ${allZones.length} region${allZones.length!==1?'s':''} — type to search`;
-    }
-  }
-  if(!filtered.length){el.innerHTML='<div class="text-muted" style="font-size:.82rem">No regions match your search.</div>';return;}
-  el.innerHTML=shown.map(z=>`
+  if(!zones.length){el.innerHTML='<div class="text-muted" style="font-size:.82rem">No regions defined yet.</div>';return;}
+  el.innerHTML=zones.map(z=>`
     <div style="display:flex;align-items:center;gap:.6rem;padding:.45rem .6rem;border-radius:8px;background:var(--surface2);border:1px solid var(--border);margin-bottom:.4rem">
       <span style="font-size:.85rem;flex:1;font-weight:600;color:var(--text)">${esc(z.name)}</span>
       ${z.desc?'<span style="font-size:.75rem;color:var(--muted);flex:1">'+esc(z.desc)+'</span>':''}
@@ -2062,7 +2004,7 @@ function renderSubscriptions(){
 
   const tbody=document.getElementById('subTableBody');
   if(!subs.length){
-    tbody.innerHTML='<tr><td colspan="11" class="empty">No subscriptions found</td></tr>';
+    tbody.innerHTML='<tr><td colspan="9" class="empty">No subscriptions found</td></tr>';
     return;
   }
   tbody.innerHTML=subs.map((s,i)=>{
@@ -2072,7 +2014,7 @@ function renderSubscriptions(){
     return`<tr>
       <td>${i+1}</td>
       <td><strong>${esc(s.name)}</strong></td>
-      <td>${esc(s.phone||'—')}${s.phone2?`<br><span style="font-size:.75rem;color:var(--muted)">${esc(s.phone2)}</span>`:''}</td>
+      <td>${esc(s.phone||'—')}</td>
       <td>${vehicleIcon(s.type)} ${esc(s.type||'—')}</td>
       <td><span class="pill-plan">${esc(s.plan||'—')}</span></td>
       <td>K${(s.price||0).toLocaleString()}</td>
@@ -2095,7 +2037,7 @@ function renderSubscriptions(){
 function openAddSubModal(){
   document.getElementById('subEditId').value='';
   document.getElementById('subModalTitle').textContent='Add Rider';
-  ['subName','subPhone','subPhone2','subPrice','subNotes','subHours'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=''; })
+  ['subName','subPhone','subPrice','subNotes','subHours'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';})
   const tripsEl=document.getElementById('subTrips');if(tripsEl)tripsEl.value=0;;
   document.getElementById('subStart').value=todayStr();
   document.getElementById('subStatus').value='active';
@@ -2109,7 +2051,6 @@ function openEditSubModal(id){
   document.getElementById('subModalTitle').textContent='Edit Rider';
   document.getElementById('subName').value=s.name||'';
   document.getElementById('subPhone').value=s.phone||'';
-  document.getElementById('subPhone2').value=s.phone2||'';
   document.getElementById('subType').value=s.type||'Motorcycle Taxi';
   document.getElementById('subPlan').value=s.plan||'Basic';
   document.getElementById('subPrice').value=s.price||'';
@@ -2126,7 +2067,6 @@ function saveSub(){
   const editId=document.getElementById('subEditId').value;
   const name=document.getElementById('subName').value.trim();
   const phone=document.getElementById('subPhone').value.trim();
-  const phone2=document.getElementById('subPhone2').value.trim();
   const type=document.getElementById('subType').value;
   const plan=document.getElementById('subPlan').value;
   const price=parseFloat(document.getElementById('subPrice').value)||0;
@@ -2143,9 +2083,9 @@ function saveSub(){
   const subs=getSubs();
   if(editId){
     const i=subs.findIndex(s=>s.id===editId);
-    if(i>-1)subs[i]={...subs[i],name,phone,phone2,type,plan,price,start,duration,expiry,status,notes,hours,trips};
+    if(i>-1)subs[i]={...subs[i],name,phone,type,plan,price,start,duration,expiry,status,notes,hours,trips};
   }else{
-    subs.push({id:uid(),name,phone,phone2,type,plan,price,start,duration,expiry,status,notes,hours,trips,created:new Date().toISOString(),availability:'available'});
+    subs.push({id:uid(),name,phone,type,plan,price,start,duration,expiry,status,notes,hours,trips,created:new Date().toISOString(),availability:'available'});
   }
   save(KEYS.subs,subs);
   // Write only the changed item (or do full save for new additions)
@@ -2262,7 +2202,6 @@ function showIdCard(id){
       <div class="id-card-divider"></div>
       <div class="id-card-row"><span>Plan</span><strong>${esc(s.plan||'—')}</strong></div>
       <div class="id-card-row"><span>Phone</span><strong>${esc(s.phone||'—')}</strong></div>
-      ${s.phone2?`<div class="id-card-row"><span>Phone 2</span><strong>${esc(s.phone2)}</strong></div>`:''}
       <div class="id-card-row"><span>Zone</span><strong>${esc(s.zone||'—')}</strong></div>
       <div class="id-card-row"><span>Valid Until</span><strong style="color:${statusColor}">${fmtDate(s.expiry)}</strong></div>
       <div class="id-card-row"><span>Ref</span><strong style="font-family:monospace;font-size:.7rem">${esc(s.ref||s.id)}</strong></div>
@@ -2308,8 +2247,6 @@ function loadSettingsPage(){
   const cfg=getSavedFbConfig();
   const inp=document.getElementById('fbConfigInput');
   if(cfg&&inp)inp.value=JSON.stringify(cfg,null,2);
-  const zs=document.getElementById('zoneSearch');
-  if(zs)zs.value='';
   renderZoneManager();
   renderZoneWaGroupList();
 }

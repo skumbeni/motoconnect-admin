@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
-<title>MotoConnect Mansa — Admin Panel</title>
+<title>MotoConnect Zambia — Admin Panel</title>
 <meta name="theme-color" content="#1e3a5f"/>
 <meta name="mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -228,7 +228,7 @@
 <div id="loginPage">
   <div class="login-card">
     <div class="login-logo">🏍️</div>
-    <h1>MotoConnect Mansa</h1>
+    <h1>MotoConnect Zambia</h1>
     <p>Admin Panel — Subscription Management</p>
     <div class="input-wrap">
       <label>Password</label>
@@ -253,7 +253,7 @@
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-logo">
       <h2>🏍️ MotoConnect</h2>
-      <span>Mansa Admin Panel</span>
+      <span>MotoConnect Zambia Admin</span>
     </div>
     <nav>
       <div class="nav-label">Overview</div>
@@ -312,7 +312,7 @@
       <div class="page-head">
         <div>
           <h2>Dashboard</h2>
-          <div class="page-head-sub">Overview of MotoConnect Mansa operations</div>
+          <div class="page-head-sub">Overview of MotoConnect Zambia operations</div>
         </div>
         <button class="btn btn-ghost btn-sm" onclick="refreshAll()">🔄 Refresh</button>
       </div>
@@ -859,9 +859,9 @@
 // ══════════════════════════════════════════════════════
 //  CONSTANTS & STATE
 // ══════════════════════════════════════════════════════
-const KEYS={pw:'mc_password',subs:'mc_subscriptions',settings:'mc_admin_settings',fbConfig:'mc_fb_config',zones:'mc_zones'};
+const KEYS={pw:'mc_password',subs:'mc_subscriptions',settings:'mc_admin_settings',fbConfig:'mc_fb_config',zones:'mc_zones_v2'};
 const DEFAULT_PW='admin123';
-const FB_PATH='motoconnect_mansa';
+const FB_PATH='motoconnect_zambia';
 let state={adminName:'Admin',warnDays:7};
 let _fbApp=null,_fbDb=null,_fbAuth=null,_fbConnected=false;
 
@@ -2195,7 +2195,7 @@ function showIdCard(id){
   const statusColor=s.status==='active'&&d!==null&&d>=0?'#10b981':'#dc2626';
   document.getElementById('idCardBody').innerHTML=`
     <div class="id-card">
-      <div class="id-card-logo">🏍️ MotoConnect Mansa</div>
+      <div class="id-card-logo">🏍️ MotoConnect Zambia</div>
       <div class="id-card-avatar">${(s.name||'?').charAt(0).toUpperCase()}</div>
       <div class="id-card-name">${esc(s.name)}</div>
       <div class="id-card-type">${vehicleIcon(s.type)} ${esc(s.type||'Rider')}</div>
@@ -2205,7 +2205,7 @@ function showIdCard(id){
       <div class="id-card-row"><span>Zone</span><strong>${esc(s.zone||'—')}</strong></div>
       <div class="id-card-row"><span>Valid Until</span><strong style="color:${statusColor}">${fmtDate(s.expiry)}</strong></div>
       <div class="id-card-row"><span>Ref</span><strong style="font-family:monospace;font-size:.7rem">${esc(s.ref||s.id)}</strong></div>
-      <div class="id-card-footer">Issued by MotoConnect Mansa · ${new Date().getFullYear()}</div>
+      <div class="id-card-footer">Issued by MotoConnect Zambia · ${new Date().getFullYear()}</div>
     </div>
   `;
   openModal('idCardModal');

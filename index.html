@@ -1541,7 +1541,13 @@ async function connectFirebase(configStr,password){
     _fbDb=firebase.database(_fbApp);
     // Sign in with a REAL admin identity (not anonymous) so Database Rules
     // can tell this panel apart from a random visitor's anonymous token.
-    await _adminSignIn(password);
+    // IMPORTANT: await auth before marking connected. The .info/connected
+    // listener fires as soon as the DB socket opens — before the auth token
+    // propagates — so writes immediately after load were rejected by Rules.
+    const user=await _adminSignIn(password);
+    if(!user){throw new Error('Admin sign-in returned no user.');}
+    // One extra tick for the SDK to attach the token to the DB connection.
+    await new Promise(res=>setTimeout(res,300));
     save(KEYS.fbConfig,parsed);
     setFbStatus(true,'Connected → '+parsed.projectId);
     showFbMsg('✅ Firebase connected! Real-time sync active.','alert-ok');
@@ -1630,11 +1636,16 @@ function attachListeners(){
     console.error('FB advertiser listener error:',err);
   });
 
-  // Connection state — flush offline queue on reconnect
+  // Connection state — flush offline queue on reconnect.
+  // Guard: only mark connected if the admin auth session is actually live.
+  // Without this, the socket connects before the auth token propagates and
+  // writes immediately after page load fail with permission-denied.
   _fbDb.ref('.info/connected').on('value',snap=>{
     if(snap.val()===true){
-      setFbStatus(true,'Connected — live');
-      flushPendingWrites();
+      // Verify auth is present before treating the connection as write-ready
+      const authed=_fbAuth&&_fbAuth.currentUser;
+      setFbStatus(!!authed,'Connected — live');
+      if(authed)flushPendingWrites();
     } else {
       setFbStatus(false,'Offline — local cache');
     }
@@ -1657,6 +1668,13 @@ async function fbWriteItem(item){
   }catch(err){
     setSyncDot('live');
     console.error('fbWriteItem failed:',err);
+    // Surface permission errors clearly — most likely cause is auth session
+    // not yet active (page just loaded) or Firebase Rules rejecting the write.
+    if(err.code==='PERMISSION_DENIED'||err.message?.includes('PERMISSION_DENIED')){
+      const authUser=_fbAuth?.currentUser?.email||'(not signed in)';
+      console.error('Permission denied. Auth state: '+authUser+'. Check Firebase Rules and that admin UID matches.');
+      throw new Error('Permission denied by Firebase. Auth: '+authUser+'. Try disconnecting and reconnecting.');
+    }
     _pendingWrites.push({type:'item',item});
     throw err;
   }

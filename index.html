@@ -2099,7 +2099,7 @@ function openApproveModal(appId){
   openModal('approveModal');
 }
 
-async function confirmApprove(){
+function confirmApprove(){
   const appId=document.getElementById('approveAppId').value;
   const price=parseFloat(document.getElementById('approvePrice').value)||0;
   const plan=document.getElementById('approvePlan').value;
@@ -2148,35 +2148,30 @@ async function confirmApprove(){
     renderZoneManager();
     renderZoneWaGroupList();
   }
-  // Save locally first
+  // Save locally and close immediately — Firebase syncs in background
   save(KEYS.subs,subs);
   refreshAll();
-  // Disable button during Firebase write
-  const btn=document.getElementById('approveBtn');
-  if(btn){btn.disabled=true;btn.textContent='Saving...';}
-  showMsg('Saving to Firebase...','alert-info');
-  try{
-    await fbWriteItem(subs[i]);
-    closeModal('approveModal');
-    showFbMsg('\u2705 Rider activated and synced to Firebase!','alert-ok');
-  }catch(err){
-    if(btn){btn.disabled=false;btn.textContent='\u2705 Activate Rider';}
-    showMsg('\u26a0\ufe0f Saved locally. Firebase sync failed: '+err.message+'. Will retry when online.','alert-warn');
-    return; // keep modal open so admin can see the warning
-  }
+  closeModal('approveModal');
+  // Background Firebase sync — non-blocking
+  fbWriteItem(subs[i])
+    .then(()=>showFbMsg('\u2705 Rider activated and synced to Firebase!','alert-ok'))
+    .catch(err=>showFbMsg('\u26a0\ufe0f Activated locally. Firebase will retry: '+err.message,'alert-warn'));
 }
 
 function rejectApp(appId){
   document.getElementById('confirmMsg').textContent='Reject this application? The rider will need to re-apply.';
   document.getElementById('confirmOkBtn').textContent='Reject';
-  document.getElementById('confirmOkBtn').onclick=async()=>{
+  document.getElementById('confirmOkBtn').onclick=()=>{
     const subs=getSubs();
     const i=subs.findIndex(s=>s.id===appId);
     if(i>-1){subs[i]={...subs[i],status:'rejected',rejectedAt:new Date().toISOString()};}
     save(KEYS.subs,subs);
-    try{await fbWriteItem(subs[i]);}catch(e){_pendingWrites.push({type:'item',item:subs[i]});}
     closeModal('confirmModal');
     refreshAll();
+    // Background Firebase sync
+    if(i>-1) fbWriteItem(subs[i])
+      .then(()=>showFbMsg('\u2705 Application rejected and synced.','alert-ok'))
+      .catch(()=>showFbMsg('\u26a0\ufe0f Rejected locally. Firebase will retry.','alert-warn'));
   };
   openModal('confirmModal');
 }
@@ -2260,7 +2255,7 @@ function openApproveAdvModal(advId){
   openModal('approveAdvModal');
 }
 
-async function confirmApproveAdv(){
+function confirmApproveAdv(){
   const advId=document.getElementById('approveAdvId').value;
   const price=parseFloat(document.getElementById('approveAdvPrice').value)||0;
   const duration=document.getElementById('approveAdvDuration').value;
@@ -2287,31 +2282,27 @@ async function confirmApproveAdv(){
   }
   save(KEYS.advertisers,ads);
   refreshAll();
-  const btn=document.getElementById('approveAdvBtn');
-  if(btn){btn.disabled=true;btn.textContent='Saving...';}
-  showMsg('Saving to Firebase...','alert-info');
-  try{
-    await fbAdvWriteItem(ads[i]);
-    closeModal('approveAdvModal');
-    showFbMsg('✅ Advertiser activated and synced to Firebase!','alert-ok');
-  }catch(err){
-    if(btn){btn.disabled=false;btn.textContent='✅ Activate Advertiser';}
-    showMsg('⚠️ Saved locally. Firebase sync failed: '+err.message+'. Will retry when online.','alert-warn');
-    return;
-  }
+  closeModal('approveAdvModal');
+  // Background Firebase sync
+  fbAdvWriteItem(ads[i])
+    .then(()=>showFbMsg('\u2705 Advertiser activated and synced to Firebase!','alert-ok'))
+    .catch(err=>showFbMsg('\u26a0\ufe0f Activated locally. Firebase will retry: '+err.message,'alert-warn'));
 }
 
 function rejectAdv(advId){
   document.getElementById('confirmMsg').textContent='Reject this advertiser listing? They will need to re-apply.';
   document.getElementById('confirmOkBtn').textContent='Reject';
-  document.getElementById('confirmOkBtn').onclick=async()=>{
+  document.getElementById('confirmOkBtn').onclick=()=>{
     const ads=getAdvertisers();
     const i=ads.findIndex(a=>a.id===advId);
     if(i>-1){ads[i]={...ads[i],status:'rejected',rejectedAt:new Date().toISOString()};}
     save(KEYS.advertisers,ads);
-    try{await fbAdvWriteItem(ads[i]);}catch(e){_pendingAdvWrites.push(ads[i]);}
     closeModal('confirmModal');
     refreshAll();
+    // Background Firebase sync
+    if(i>-1) fbAdvWriteItem(ads[i])
+      .then(()=>showFbMsg('\u2705 Advertiser rejected and synced.','alert-ok'))
+      .catch(()=>showFbMsg('\u26a0\ufe0f Rejected locally. Firebase will retry.','alert-warn'));
   };
   openModal('confirmModal');
 }

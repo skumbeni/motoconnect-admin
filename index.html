@@ -231,13 +231,8 @@
     <h1>MotoConnect Zambia</h1>
     <p>Admin Panel — Subscription Management</p>
     <div class="input-wrap">
-      <label>Panel Password</label>
+      <label>Password</label>
       <input type="password" id="loginPw" placeholder="Enter admin password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()"/>
-    </div>
-    <div class="input-wrap" id="fbPwWrap" style="display:none">
-      <label>Firebase Password <span style="font-weight:400;color:var(--muted);font-size:.7rem">(skumbeni@gmail.com)</span></label>
-      <input type="password" id="loginFbPw" placeholder="Firebase Auth password" autocomplete="off" onkeydown="if(event.key==='Enter')doLogin()"/>
-      <div style="font-size:.72rem;color:var(--muted);margin-top:.3rem">Only needed first time on this device.</div>
     </div>
     <button class="btn btn-primary" onclick="doLogin()">🔐 Sign In</button>
     <div id="loginErr" style="display:none" class="alert alert-err">Incorrect password. Try again.</div>
@@ -627,16 +622,6 @@
         <div id="zoneWaGroupList"></div>
       </div>
 
-      <div class="settings-card">
-        <h3>🔑 Firebase Auth Password</h3>
-        <p style="font-size:.82rem;color:var(--muted);margin-bottom:.75rem">The Firebase password for <strong>skumbeni@gmail.com</strong>. Saved on this device after first login.</p>
-        <div class="form-row">
-          <label>Firebase Password</label>
-          <input type="password" id="settingFbPw" placeholder="Enter Firebase Auth password"/>
-        </div>
-        <button class="btn btn-primary btn-sm" onclick="saveSettingFbPw()">Save Firebase Password</button>
-        <div id="fbPwSettingMsg" style="display:none;margin-top:.6rem" class="alert"></div>
-      </div>
       <div class="settings-card">
         <h3>🗑️ Data Management</h3>
         <p style="font-size:.82rem;color:var(--muted);margin-bottom:.75rem">Clear all local subscription data. Firebase data is not affected.</p>
@@ -1515,27 +1500,16 @@ function setFbStatus(connected,msg){
 // use. Firebase also persists the signed-in session in this browser (the
 // app name is fixed, not regenerated each time), so even the password
 // prompt only fires once per device, on first connect.
-async function _adminSignIn(password){
-  // Right after creating a fresh auth() instance, the SDK needs a tick to
-  // rehydrate any persisted session from storage — currentUser is often
-  // null synchronously even when a session exists. Wait for the first
-  // auth-state determination before deciding whether to prompt.
+async function _adminSignIn(){
   await new Promise(res=>{
     const unsub=_fbAuth.onAuthStateChanged(u=>{unsub();res(u);});
   });
-  if(_fbAuth.currentUser){
-    console.log('Admin Firebase session restored:',_fbAuth.currentUser.email);
-    return _fbAuth.currentUser;
-  }
-  // Fallback prompt only happens if this was called without a password
-  // (e.g. clicking "Connect" manually rather than through the login screen).
-  const pw=password||prompt('Firebase admin password (first-time connect on this device):');
-  if(!pw)throw new Error('Admin sign-in cancelled — no password entered.');
+  if(_fbAuth.currentUser)return _fbAuth.currentUser;
   try{
-    const cred=await _fbAuth.signInWithEmailAndPassword(ADMIN_FIREBASE_EMAIL,pw);
+    const cred=await _fbAuth.signInAnonymously();
     return cred.user;
   }catch(authErr){
-    throw new Error('Firebase admin sign-in failed: '+authErr.message);
+    throw new Error('Firebase sign-in failed: '+authErr.message);
   }
 }
 
@@ -1559,10 +1533,9 @@ async function connectFirebase(configStr,password){
     // IMPORTANT: await auth before marking connected. The .info/connected
     // listener fires as soon as the DB socket opens — before the auth token
     // propagates — so writes immediately after load were rejected by Rules.
-    const user=await _adminSignIn(password);
-    if(!user){throw new Error('Admin sign-in returned no user.');}
-    // One extra tick for the SDK to attach the token to the DB connection.
-    await new Promise(res=>setTimeout(res,300));
+    const user=await _adminSignIn();
+    if(!user){throw new Error('Firebase sign-in returned no user.');}
+    await new Promise(res=>setTimeout(res,500));
     save(KEYS.fbConfig,parsed);
     setFbStatus(true,'Connected → '+parsed.projectId);
     showFbMsg('✅ Firebase connected! Real-time sync active.','alert-ok');
@@ -1592,19 +1565,47 @@ function attachListeners(){
     if(data&&typeof data==='object'){
       const fbItems=Object.values(data).filter(Boolean);
       if(fbItems.length>0){
-        // Merge: Firebase wins for shared records; keep local-only records (not yet synced)
+        // Merge: LOCAL wins for recently-modified records (approved/rejected in last 30s)
+        // Firebase wins for everything else; keep local-only records not yet in Firebase
         const local=getSubs();
+        const localMap={};
+        local.forEach(s=>{if(s&&s.id)localMap[s.id]=s;});
         const fbMap={};
         fbItems.forEach(s=>{if(s&&s.id)fbMap[s.id]=s;});
-        local.forEach(s=>{if(s&&s.id&&!fbMap[s.id])fbMap[s.id]=s;});
-        const merged=Object.values(fbMap).filter(Boolean);
+        // For each record: if local was modified more recently, keep local
+        const now=Date.now();
+        const merged={};
+        // Start with Firebase data
+        Object.assign(merged,fbMap);
+        // Local overrides Firebase for recently-touched records
+        local.forEach(s=>{
+          if(!s||!s.id)return;
+          const fbItem=fbMap[s.id];
+          if(!fbItem){
+            // Local-only — not in Firebase yet, keep it
+            merged[s.id]=s;
+          } else {
+            // If local has a newer approvedAt/rejectedAt/renewedAt, local wins
+            const localTs=Math.max(
+              s.approvedAt?new Date(s.approvedAt).getTime():0,
+              s.rejectedAt?new Date(s.rejectedAt).getTime():0,
+              s.renewedAt?new Date(s.renewedAt).getTime():0
+            );
+            const fbTs=Math.max(
+              fbItem.approvedAt?new Date(fbItem.approvedAt).getTime():0,
+              fbItem.rejectedAt?new Date(fbItem.rejectedAt).getTime():0,
+              fbItem.renewedAt?new Date(fbItem.renewedAt).getTime():0
+            );
+            if(localTs>fbTs) merged[s.id]=s;
+          }
+        });
+        const result=Object.values(merged).filter(Boolean);
         // Auto-expire
         const today=new Date();today.setHours(0,0,0,0);
-        merged.forEach(s=>{if(s.status==='active'&&s.expiry&&new Date(s.expiry)<today)s.status='expired';});
-        save(KEYS.subs,merged);
+        result.forEach(s=>{if(s.status==='active'&&s.expiry&&new Date(s.expiry)<today)s.status='expired';});
+        save(KEYS.subs,result);
         refreshAll();
       }
-      // If snapshot is empty, keep local data intact — never wipe on empty cloud response
     }
   },err=>{
     console.error('FB listener error:',err);
@@ -1629,8 +1630,7 @@ function attachListeners(){
     }
   });
 
-  // Real-time advertiser listener — so advertiser sign-ups from the public
-  // app's "Advertise" flow show up here for approval, same as rider apps.
+  // Real-time advertiser listener
   _fbDb.ref(FB_PATH+'/advertisers').on('value',snap=>{
     const data=snap.val();
     if(data&&typeof data==='object'){
@@ -1639,11 +1639,28 @@ function attachListeners(){
         const local=getAdvertisers();
         const fbMap={};
         fbItems.forEach(a=>{if(a&&a.id)fbMap[a.id]=a;});
-        local.forEach(a=>{if(a&&a.id&&!fbMap[a.id])fbMap[a.id]=a;});
-        const merged=Object.values(fbMap).filter(Boolean);
+        const merged={};
+        Object.assign(merged,fbMap);
+        local.forEach(a=>{
+          if(!a||!a.id)return;
+          const fbItem=fbMap[a.id];
+          if(!fbItem){merged[a.id]=a;}
+          else{
+            const localTs=Math.max(
+              a.approvedAt?new Date(a.approvedAt).getTime():0,
+              a.rejectedAt?new Date(a.rejectedAt).getTime():0
+            );
+            const fbTs=Math.max(
+              fbItem.approvedAt?new Date(fbItem.approvedAt).getTime():0,
+              fbItem.rejectedAt?new Date(fbItem.rejectedAt).getTime():0
+            );
+            if(localTs>fbTs) merged[a.id]=a;
+          }
+        });
+        const result=Object.values(merged).filter(Boolean);
         const today=new Date();today.setHours(0,0,0,0);
-        merged.forEach(a=>{if(a.status==='active'&&a.expiry&&new Date(a.expiry)<today)a.status='expired';});
-        save(KEYS.advertisers,merged);
+        result.forEach(a=>{if(a.status==='active'&&a.expiry&&new Date(a.expiry)<today)a.status='expired';});
+        save(KEYS.advertisers,result);
         refreshAll();
       }
     }
@@ -1812,11 +1829,6 @@ const _LOCKOUT_MS=15*60*1000; // 15 minutes
 function _getLockout(){try{const v=localStorage.getItem('mca_lockout');return v?JSON.parse(v):{attempts:0,until:0};}catch{return{attempts:0,until:0};}}
 function _setLockout(d){try{localStorage.setItem('mca_lockout',JSON.stringify(d));}catch{}}
 
-// Firebase password stored separately from panel password
-const FB_PW_KEY='mca_fb_pw';
-function getSavedFbPw(){try{return localStorage.getItem(FB_PW_KEY)||'';}catch(e){return '';}}
-function saveFbPw(pw){try{localStorage.setItem(FB_PW_KEY,pw);}catch(e){}}
-
 function doLogin(){
   const lockout=_getLockout();
   const now=Date.now();
@@ -1829,26 +1841,12 @@ function doLogin(){
   }
   const pw=document.getElementById('loginPw').value;
   if(pw===getPassword()){
-    // Check we have a Firebase password — either saved or typed
-    const savedFbPw=getSavedFbPw();
-    const typedFbPw=(document.getElementById('loginFbPw')?.value||'').trim();
-    const fbPw=typedFbPw||savedFbPw;
-    if(!fbPw){
-      // Show Firebase password field and ask user to fill it
-      const wrap=document.getElementById('fbPwWrap');
-      if(wrap){wrap.style.display='block';document.getElementById('loginFbPw').focus();}
-      err.textContent='Enter your Firebase Auth password to continue.';
-      err.className='alert alert-warn';
-      err.style.display='block';
-      return;
-    }
-    if(typedFbPw) saveFbPw(typedFbPw); // persist for future logins
     _setLockout({attempts:0,until:0});
     document.getElementById('loginPage').style.display='none';
     document.getElementById('app').style.display='block';
     loadSettings();
     refreshAll();
-    connectFirebase(JSON.stringify(getSavedFbConfig()),fbPw);
+    connectFirebase(JSON.stringify(getSavedFbConfig()),pw);
   }else{
     const attempts=lockout.attempts+1;
     const until=attempts>=_MAX_ATTEMPTS?now+_LOCKOUT_MS:0;
@@ -1859,7 +1857,6 @@ function doLogin(){
     } else {
       err.textContent='Incorrect password. '+(remaining>0?remaining+' attempt'+(remaining!==1?'s':'')+' remaining.':'');
     }
-    err.className='alert alert-err';
     err.style.display='block';
     setTimeout(()=>err.style.display='none',4000);
   }
@@ -2680,16 +2677,6 @@ function changePassword(){
   save(KEYS.pw,nw);
   show('Password updated successfully.','alert-ok');
   ['curPw','newPw','confPw'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
-}
-
-function saveSettingFbPw(){
-  const pw=document.getElementById('settingFbPw').value.trim();
-  const msg=document.getElementById('fbPwSettingMsg');
-  const show=(t,cls)=>{msg.textContent=t;msg.className='alert '+cls;msg.style.display='block';setTimeout(()=>msg.style.display='none',3500);};
-  if(!pw){show('Please enter a password.','alert-err');return;}
-  saveFbPw(pw);
-  document.getElementById('settingFbPw').value='';
-  show('✅ Firebase password saved. It will be used on next login.','alert-ok');
 }
 
 function clearAllData(){

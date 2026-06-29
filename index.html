@@ -1108,7 +1108,7 @@
 // ══════════════════════════════════════════════════════
 //  CONSTANTS & STATE
 // ══════════════════════════════════════════════════════
-const KEYS={pw:'mc_password',subs:'mc_subscriptions',settings:'mc_admin_settings',fbConfig:'mc_fb_config',fbPw:'mc_fb_pw',zones:'mc_zones_v2',advertisers:'mc_advertisers',pendingWrites:'mc_pending_writes',pendingAdvWrites:'mc_pending_adv_writes'};
+const KEYS={pw:'mc_password',subs:'mc_subscriptions',settings:'mc_admin_settings',fbConfig:'mc_fb_config',fbPw:'mc_fb_pw',zones:'mc_zones_v2',advertisers:'mc_advertisers',pendingWrites:'mc_pending_writes',pendingAdvWrites:'mc_pending_adv_writes',pendingZoneWrites:'mc_pending_zone_writes'};
 const DEFAULT_PW='admin123';
 const FB_PATH='motoconnect_zambia';
 let state={adminName:'Admin',warnDays:7};
@@ -1129,12 +1129,14 @@ function getAdvertisers(){return load(KEYS.advertisers,[]);}
 // the moment the JS context goes away before a reconnect can flush it.
 let _pendingWrites=load(KEYS.pendingWrites,[]);
 let _pendingAdvWrites=load(KEYS.pendingAdvWrites,[]);
+let _pendingZoneWrites=load(KEYS.pendingZoneWrites,[]);
 function _persistPendingWrites(){save(KEYS.pendingWrites,_pendingWrites);_updatePendingBadge();}
 function _persistPendingAdvWrites(){save(KEYS.pendingAdvWrites,_pendingAdvWrites);_updatePendingBadge();}
+function _persistPendingZoneWrites(){save(KEYS.pendingZoneWrites,_pendingZoneWrites);_updatePendingBadge();}
 function _updatePendingBadge(){
   const badge=document.getElementById('pendingWritesBadge');
   if(!badge)return;
-  const total=_pendingWrites.length+_pendingAdvWrites.length;
+  const total=_pendingWrites.length+_pendingAdvWrites.length+_pendingZoneWrites.length;
   if(total>0){
     badge.style.display='inline-block';
     badge.textContent='⏳ '+total+' pending — tap to retry';
@@ -1857,20 +1859,62 @@ function attachListeners(){
     setTimeout(()=>attachListeners(),5000);
   });
 
-  // Real-time zones listener — keeps admin in sync with public app zone additions
+  // Real-time zones listener — keeps admin in sync with public app zone additions.
+  // Merge strategy:
+  //   • FB wins on conflict (same id, newer or equal timestamp).
+  //   • Local-only zones whose id is in _pendingZoneWrites are "not yet synced" → keep.
+  //   • Local-only zones whose id is NOT pending are "deleted remotely" → drop.
+  //   • Tombstones (z.__deleted===true) from FB always win — remove locally.
   _fbDb.ref(FB_PATH+'/zones').on('value',snap=>{
     const data=snap.val();
+    const local=getZones();
+    // Set of ids we have queued to write (not yet confirmed by FB)
+    const pendingIds=new Set(_pendingZoneWrites.map(w=>w.id).filter(Boolean));
+
     if(data&&typeof data==='object'){
-      const fbZones=Object.values(data).filter(Boolean);
-      if(fbZones.length>0){
-        // Merge: union of local + Firebase zones (Firebase wins on conflict by id)
-        const localMap={};
-        getZones().forEach(z=>{if(z&&z.id)localMap[z.id]=z;});
-        fbZones.forEach(z=>{if(z&&z.id)localMap[z.id]=z;});
-        save(KEYS.zones,Object.values(localMap));
-        renderZoneManager&&renderZoneManager();
-      }
+      const fbMap={};
+      Object.values(data).filter(Boolean).forEach(z=>{if(z&&z.id)fbMap[z.id]=z;});
+
+      const merged={};
+      // Start from FB as the source of truth
+      Object.assign(merged,fbMap);
+
+      // Walk local zones: decide what to keep beyond what FB already has
+      local.forEach(z=>{
+        if(!z||!z.id)return;
+        const fbItem=fbMap[z.id];
+        if(fbItem){
+          // Both sides have it — FB already won via Object.assign above.
+          // Only override if local is strictly newer (has a updatedAt that beats FB).
+          const localTs=z.updatedAt?new Date(z.updatedAt).getTime():0;
+          const fbTs=fbItem.updatedAt?new Date(fbItem.updatedAt).getTime():0;
+          if(localTs>fbTs) merged[z.id]=z;
+        } else {
+          // FB doesn't have this zone.
+          if(pendingIds.has(z.id)){
+            // We know we wrote it but the push hasn't landed yet → keep it.
+            merged[z.id]=z;
+          }
+          // else: FB never had it and we're not waiting to push it →
+          // it was deleted remotely; do NOT re-add it.
+        }
+      });
+
+      // Honour tombstones: anything FB marks __deleted must be removed.
+      Object.values(merged).forEach(z=>{if(z&&z.__deleted)delete merged[z.id];});
+
+      save(KEYS.zones,Object.values(merged).filter(Boolean));
+    } else {
+      // FB returned null/empty.  Only keep local zones that are still pending.
+      // Everything else has either never been pushed or was deleted remotely.
+      const kept=local.filter(z=>z&&z.id&&pendingIds.has(z.id));
+      save(KEYS.zones,kept);
     }
+    renderZoneManager&&renderZoneManager();
+  },err=>{
+    console.error('FB zones listener error:',err);
+    // Keep rendering from local cache on error
+    renderZoneManager&&renderZoneManager();
   });
 
   // Real-time advertiser listener
@@ -1995,27 +2039,63 @@ async function fbAdvWriteItem(item){
   }
 }
 
-// Full list save (used for batch ops like deletions)
-async function fbSave(items){
-  save(KEYS.subs,items);
+// Zone write helper — mirrors fbAdvWriteItem but targets /zones node.
+// Keeps zone sync independent from subscriptions and advertisers so a
+// failure in one queue never stalls the others.
+async function fbZoneWriteItem(zone){
+  if(!zone||!zone.id)return false;
   if(!_fbDb||!_fbConnected){
-    _pendingWrites.push({type:'full',items:[...items]});
-    _persistPendingWrites();
-    console.warn('FB offline — queued full save');
+    // Deduplicate: replace existing pending entry for same id if present
+    _pendingZoneWrites=_pendingZoneWrites.filter(w=>w.id!==zone.id);
+    _pendingZoneWrites.push({type:'item',id:zone.id,zone});
+    _persistPendingZoneWrites();
+    console.warn('FB offline — queued zone write for',zone.id);
     return false;
   }
   try{
     setSyncDot('syncing');
-    const obj={};
-    items.forEach(it=>{if(it.id)obj[it.id]=it;});
-    await _fbDb.ref(FB_PATH+'/subscriptions').set(obj);
+    await _fbDb.ref(FB_PATH+'/zones/'+zone.id).set(zone);
+    // Write confirmed — remove from pending queue if it was there
+    _pendingZoneWrites=_pendingZoneWrites.filter(w=>w.id!==zone.id);
+    _persistPendingZoneWrites();
     setSyncDot('live');
     return true;
   }catch(err){
     setSyncDot('live');
-    console.error('fbSave failed:',err);
-    _pendingWrites.push({type:'full',items:[...items]});
-    _persistPendingWrites();
+    console.error('fbZoneWriteItem failed:',err);
+    _pendingZoneWrites=_pendingZoneWrites.filter(w=>w.id!==zone.id);
+    _pendingZoneWrites.push({type:'item',id:zone.id,zone});
+    _persistPendingZoneWrites();
+    throw err;
+  }
+}
+
+// Zone delete helper — writes a tombstone so remote listeners know the
+// zone was intentionally removed (not just not-yet-synced).
+async function fbZoneDeleteItem(zoneId){
+  if(!zoneId)return false;
+  if(!_fbDb||!_fbConnected){
+    _pendingZoneWrites=_pendingZoneWrites.filter(w=>w.id!==zoneId);
+    _pendingZoneWrites.push({type:'delete',id:zoneId});
+    _persistPendingZoneWrites();
+    console.warn('FB offline — queued zone delete for',zoneId);
+    return false;
+  }
+  try{
+    setSyncDot('syncing');
+    // Write tombstone first so listeners see __deleted before the node vanishes
+    await _fbDb.ref(FB_PATH+'/zones/'+zoneId).set({id:zoneId,__deleted:true,deletedAt:new Date().toISOString()});
+    await _fbDb.ref(FB_PATH+'/zones/'+zoneId).remove();
+    _pendingZoneWrites=_pendingZoneWrites.filter(w=>w.id!==zoneId);
+    _persistPendingZoneWrites();
+    setSyncDot('live');
+    return true;
+  }catch(err){
+    setSyncDot('live');
+    console.error('fbZoneDeleteItem failed:',err);
+    _pendingZoneWrites=_pendingZoneWrites.filter(w=>w.id!==zoneId);
+    _pendingZoneWrites.push({type:'delete',id:zoneId});
+    _persistPendingZoneWrites();
     throw err;
   }
 }
@@ -2030,15 +2110,33 @@ async function flushPendingWrites(){
     const advQueue=[..._pendingAdvWrites];
     _pendingAdvWrites=[];
     _persistPendingAdvWrites();
-    try{
-      for(const item of advQueue){
-        await _fbDb.ref(FB_PATH+'/advertisers/'+item.id).set(item);
-      }
-    }catch(err){
-      _pendingAdvWrites=[...advQueue,..._pendingAdvWrites];
-      _persistPendingAdvWrites();
-      console.error('Advertiser flush failed:',err);
+    const stillFailed=[];
+    for(const item of advQueue){
+      try{ await _fbDb.ref(FB_PATH+'/advertisers/'+item.id).set(item); }
+      catch(err){ stillFailed.push(item); console.error('Advertiser flush failed:',err); }
     }
+    if(stillFailed.length){_pendingAdvWrites=[...stillFailed,..._pendingAdvWrites];_persistPendingAdvWrites();}
+  }
+  if(_pendingZoneWrites.length){
+    const zoneQueue=[..._pendingZoneWrites];
+    _pendingZoneWrites=[];
+    _persistPendingZoneWrites();
+    const stillFailedZones=[];
+    for(const w of zoneQueue){
+      try{
+        if(w.type==='item'){
+          await _fbDb.ref(FB_PATH+'/zones/'+w.id).set(w.zone);
+        }else if(w.type==='delete'){
+          // Tombstone then remove — same two-step as fbZoneDeleteItem
+          await _fbDb.ref(FB_PATH+'/zones/'+w.id).set({id:w.id,__deleted:true,deletedAt:new Date().toISOString()});
+          await _fbDb.ref(FB_PATH+'/zones/'+w.id).remove();
+        }
+      }catch(err){
+        stillFailedZones.push(w);
+        console.error('Zone flush failed for',w.type,w.id,err);
+      }
+    }
+    if(stillFailedZones.length){_pendingZoneWrites=[...stillFailedZones,..._pendingZoneWrites];_persistPendingZoneWrites();}
   }
   if(!_pendingWrites.length)return;
   const queue=[..._pendingWrites];
@@ -2046,25 +2144,35 @@ async function flushPendingWrites(){
   _persistPendingWrites();
   console.log('Flushing',queue.length,'pending writes…');
   setSyncDot('syncing');
-  try{
-    // Collapse: if there's a full-save in queue, use the last one; else apply items
-    const lastFull=queue.filter(w=>w.type==='full').pop();
-    if(lastFull){
-      const obj={};
-      lastFull.items.forEach(it=>{if(it.id)obj[it.id]=it;});
-      await _fbDb.ref(FB_PATH+'/subscriptions').set(obj);
-    } else {
-      for(const w of queue){
-        if(w.type==='item') await _fbDb.ref(FB_PATH+'/subscriptions/'+w.item.id).set(w.item);
+  // Each queued write is applied independently — one failure shouldn't
+  // block the rest, and nothing here ever overwrites the parent
+  // /subscriptions path (Security Rules only grant write per rider id).
+  const stillFailed=[];
+  for(const w of queue){
+    try{
+      if(w.type==='item'){
+        await _fbDb.ref(FB_PATH+'/subscriptions/'+w.item.id).set(w.item);
+      }else if(w.type==='delete'){
+        await _fbDb.ref(FB_PATH+'/subscriptions/'+w.id).remove();
+      }else if(w.type==='full'){
+        // Legacy queue entry from before this fix — replay as individual
+        // per-child writes rather than a forbidden parent overwrite.
+        for(const it of (w.items||[])){
+          if(it.id) await _fbDb.ref(FB_PATH+'/subscriptions/'+it.id).set(it);
+        }
       }
+    }catch(err){
+      stillFailed.push(w);
+      console.error('Flush failed for',w.type,err);
     }
-    setSyncDot('live');
-    showFbMsg('✅ Offline writes synced to Firebase.','alert-ok');
-  }catch(err){
-    setSyncDot('live');
-    _pendingWrites=[...queue,..._pendingWrites]; // put back
+  }
+  setSyncDot('live');
+  if(stillFailed.length){
+    _pendingWrites=[...stillFailed,..._pendingWrites];
     _persistPendingWrites();
-    console.error('Flush failed:',err);
+    showFbMsg('⚠️ Some offline writes are still pending — will retry.','alert-warn');
+  }else{
+    showFbMsg('✅ Offline writes synced to Firebase.','alert-ok');
   }
 }
 
@@ -2073,14 +2181,24 @@ function setSyncDot(state){
   if(dot)dot.className='sync-dot'+( state==='live'?' live':state==='syncing'?' syncing':'');
 }
 
-function pushToFirebase(){
+async function pushToFirebase(){
   if(!_fbDb||!_fbConnected){alert('Connect Firebase first.');return;}
-  const obj={};
-  getSubs().forEach(s=>{if(s.id)obj[s.id]=s;});
+  const subs=getSubs();
   setSyncDot('syncing');
-  _fbDb.ref(FB_PATH+'/subscriptions').set(obj)
-    .then(()=>{setSyncDot('live');showFbMsg('✅ All local data pushed to Firebase!','alert-ok');})
-    .catch(e=>{setSyncDot('live');showFbMsg('❌ Failed: '+e.message,'alert-err');});
+  try{
+    // Per-child writes, not a single overwrite of the whole /subscriptions
+    // node — Security Rules only grant write at subscriptions/$id, not at
+    // the parent path, so one .set() on the full list would be denied even
+    // though every individual child write succeeds.
+    for(const s of subs){
+      if(s.id) await _fbDb.ref(FB_PATH+'/subscriptions/'+s.id).set(s);
+    }
+    setSyncDot('live');
+    showFbMsg('✅ All local data pushed to Firebase!','alert-ok');
+  }catch(e){
+    setSyncDot('live');
+    showFbMsg('❌ Failed: '+e.message,'alert-err');
+  }
 }
 
 function showFbMsg(txt,cls){
@@ -2811,8 +2929,11 @@ function adminAddZone(){
   if(!name){show('Please enter a region name.','alert-err');return;}
   const zones=getZones();
   if(zones.some(z=>z.name.toLowerCase()===name.toLowerCase())){show('That region already exists.','alert-warn');return;}
-  zones.push({id:uid(),name,desc,mult:1.0});
+  const newZone={id:uid(),name,desc,mult:1.0,updatedAt:new Date().toISOString()};
+  zones.push(newZone);
   save(KEYS.zones,zones);
+  // Push to Firebase; if offline the write is queued in _pendingZoneWrites
+  fbZoneWriteItem(newZone).catch(()=>{});
   document.getElementById('newZoneName').value='';
   document.getElementById('newZoneDesc').value='';
   renderZoneManager();
@@ -2823,6 +2944,8 @@ function adminAddZone(){
 function adminDeleteZone(zoneId){
   if(!confirm('Remove this region? Riders already assigned to it keep their zone name.'))return;
   save(KEYS.zones,getZones().filter(z=>z.id!==zoneId));
+  // Delete from Firebase; if offline the tombstone write is queued
+  fbZoneDeleteItem(zoneId).catch(()=>{});
   renderZoneManager();
   renderZoneWaGroupList();
 }
@@ -2932,9 +3055,13 @@ function saveSub(){
   save(KEYS.subs,subs);
   // Write only the changed item (or do full save for new additions)
   const changedItem=editId?subs.find(s=>s.id===editId):subs[subs.length-1];
-  if(changedItem) fbWriteItem(changedItem).catch(()=>{_pendingWrites.push({type:'item',item:changedItem});_persistPendingWrites();});
   closeModal('subModal');
   refreshAll();
+  if(changedItem){
+    fbWriteItem(changedItem)
+      .then(()=>showFbMsg('✅ Rider saved and synced.','alert-ok'))
+      .catch(err=>showFbMsg('⚠️ Saved locally. Firebase: '+err.message,'alert-warn'));
+  }
 }
 
 function deleteSub(id){
@@ -2942,9 +3069,32 @@ function deleteSub(id){
   document.getElementById('confirmOkBtn').textContent='Delete';
   document.getElementById('confirmOkBtn').onclick=async()=>{
     const remaining=getSubs().filter(s=>s.id!==id);
-    try{ await fbSave(remaining); }catch(e){ /* queued internally */ }
+    save(KEYS.subs,remaining);
     closeModal('confirmModal');
     refreshAll();
+    // Remove the single child node directly — same write-permission scope
+    // (subscriptions/$id) that approvals and edits already use successfully.
+    // NEVER overwrite the whole /subscriptions list to "delete" one rider:
+    // Security Rules grant write at the per-rider child path, not at the
+    // parent path, so a full-list .set() here gets silently denied even
+    // though every individual child write succeeds.
+    if(_fbDb&&_fbConnected){
+      try{
+        setSyncDot('syncing');
+        await _fbDb.ref(FB_PATH+'/subscriptions/'+id).remove();
+        setSyncDot('live');
+        showFbMsg('✅ Rider deleted and synced.','alert-ok');
+      }catch(e){
+        setSyncDot('live');
+        _pendingWrites.push({type:'delete',id});
+        _persistPendingWrites();
+        showFbMsg('⚠️ Deleted locally. Firebase: '+e.message,'alert-warn');
+      }
+    }else{
+      _pendingWrites.push({type:'delete',id});
+      _persistPendingWrites();
+      showFbMsg('⚠️ Deleted locally. Will sync when reconnected.','alert-warn');
+    }
   };
   openModal('confirmModal');
 }

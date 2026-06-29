@@ -1794,13 +1794,14 @@ function attachListeners(){
         const today=new Date();today.setHours(0,0,0,0);
         result.forEach(s=>{if(s.status==='active'&&s.expiry&&new Date(s.expiry)<today)s.status='expired';});
         save(KEYS.subs,result);
-        refreshAll();
       }
     }
+    refreshAll();
   },err=>{
     console.error('FB listener error:',err);
     setFbStatus(false,'Listener error — retrying…');
     _listenerAttached=false;
+    refreshAll();
     setTimeout(()=>attachListeners(),5000);
   });
 
@@ -1823,10 +1824,11 @@ function attachListeners(){
   // Real-time advertiser listener
   _fbDb.ref(FB_PATH+'/advertisers').on('value',snap=>{
     const data=snap.val();
+    const local=getAdvertisers();
     if(data&&typeof data==='object'){
       const fbItems=Object.values(data).filter(Boolean);
       if(fbItems.length>0){
-        const local=getAdvertisers();
+        // Merge Firebase + local: local wins if it was modified more recently
         const fbMap={};
         fbItems.forEach(a=>{if(a&&a.id)fbMap[a.id]=a;});
         const merged={};
@@ -1834,15 +1836,20 @@ function attachListeners(){
         local.forEach(a=>{
           if(!a||!a.id)return;
           const fbItem=fbMap[a.id];
-          if(!fbItem){merged[a.id]=a;}
-          else{
+          if(!fbItem){
+            merged[a.id]=a; // local-only record not yet in Firebase
+          }else{
             const localTs=Math.max(
               a.approvedAt?new Date(a.approvedAt).getTime():0,
-              a.rejectedAt?new Date(a.rejectedAt).getTime():0
+              a.rejectedAt?new Date(a.rejectedAt).getTime():0,
+              a.renewedAt?new Date(a.renewedAt).getTime():0,
+              a.updatedAt?new Date(a.updatedAt).getTime():0
             );
             const fbTs=Math.max(
               fbItem.approvedAt?new Date(fbItem.approvedAt).getTime():0,
-              fbItem.rejectedAt?new Date(fbItem.rejectedAt).getTime():0
+              fbItem.rejectedAt?new Date(fbItem.rejectedAt).getTime():0,
+              fbItem.renewedAt?new Date(fbItem.renewedAt).getTime():0,
+              fbItem.updatedAt?new Date(fbItem.updatedAt).getTime():0
             );
             if(localTs>fbTs) merged[a.id]=a;
           }
@@ -1851,11 +1858,17 @@ function attachListeners(){
         const today=new Date();today.setHours(0,0,0,0);
         result.forEach(a=>{if(a.status==='active'&&a.expiry&&new Date(a.expiry)<today)a.status='expired';});
         save(KEYS.advertisers,result);
-        refreshAll();
       }
+      // Firebase returned data (even if empty object) — render whatever we have
     }
+    // Always re-render: covers (a) Firebase empty/null, (b) local-only data,
+    // (c) post-merge result. Without this, local advertisers never appear
+    // if Firebase hasn't received them yet.
+    refreshAll();
   },err=>{
     console.error('FB advertiser listener error:',err);
+    // Still render from local cache on error so existing data isn't lost
+    refreshAll();
   });
 
   // Connection state — flush offline queue on reconnect.

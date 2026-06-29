@@ -307,7 +307,6 @@
     <div class="topbar-right">
       <div class="sync-dot" id="syncDot" title="Firebase connection status"></div>
       <span class="sync-label" id="syncLabel">Not connected</span>
-      <span id="pendingWritesBadge" title="Writes made while offline, waiting to sync to Firebase" style="display:none;background:#fef3c7;color:#92400e;border:1px solid #fcd34d;border-radius:999px;padding:.1rem .55rem;font-size:.7rem;font-weight:700;margin-left:.4rem;cursor:pointer" onclick="flushPendingWrites()">⏳ 0 pending</span>
     </div>
   </div>
 
@@ -421,8 +420,9 @@
       <div class="page-head">
         <div>
           <h2>Advertiser Listings</h2>
-          <div class="page-head-sub">Review and approve advertiser/business listings submitted from the public app</div>
+          <div class="page-head-sub">Review, approve, and manage advertiser/business listings</div>
         </div>
+        <button class="btn btn-primary btn-sm" onclick="openAddAdvModal()">+ Add Advertiser</button>
       </div>
       <div class="toolbar">
         <input class="search-input" placeholder="🔍 Search business, phone, ref…" id="advSearch" oninput="renderAdvertisers()"/>
@@ -431,6 +431,18 @@
           <option value="pending">Pending</option>
           <option value="active">Approved</option>
           <option value="rejected">Rejected</option>
+        </select>
+        <select class="filter-select" id="advFilterCategory" onchange="renderAdvertisers()">
+          <option value="">All Categories</option>
+          <option value="fuel">Filling Station</option>
+          <option value="courier">Courier &amp; Logistics</option>
+          <option value="supermarket">Supermarket</option>
+          <option value="restaurant">Restaurant</option>
+          <option value="cafe">Café</option>
+          <option value="mechanic">Auto / Mechanic</option>
+          <option value="lodge">Lodge / Guesthouse</option>
+          <option value="momo">Mobile Money Agent</option>
+          <option value="other">Other Business</option>
         </select>
       </div>
       <div id="advQueueList">
@@ -725,6 +737,14 @@
       <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:.5rem">Listing Terms</div>
       <div class="form-grid">
         <div class="form-row">
+          <label>Tier</label>
+          <select id="approveAdvTier" onchange="document.getElementById('approveAdvPrice').value=({basic:300,featured:600,premium:1000}[this.value]||0)">
+            <option value="basic">Basic — K300/mo</option>
+            <option value="featured">Featured — K600/mo</option>
+            <option value="premium">Premium — K1000/mo</option>
+          </select>
+        </div>
+        <div class="form-row">
           <label>Monthly Price (ZMW)</label>
           <input type="number" id="approveAdvPrice" min="0" placeholder="Auto-set from tier"/>
         </div>
@@ -755,6 +775,160 @@
     <div class="modal-footer">
       <button class="btn btn-ghost btn-sm" onclick="closeModal('approveAdvModal')">Cancel</button>
       <button class="btn btn-success btn-sm" id="approveAdvBtn" onclick="confirmApproveAdv()">✅ Activate Advertiser</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add / Edit Advertiser -->
+<div class="overlay" id="advModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="advModalTitle">Add Advertiser</h3>
+      <button class="close-btn" onclick="closeModal('advModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="advEditId"/>
+      <div class="form-grid">
+        <div class="form-row">
+          <label>Business Name *</label>
+          <input type="text" id="advName" placeholder="e.g. Chanda's Filling Station"/>
+        </div>
+        <div class="form-row">
+          <label>Phone *</label>
+          <input type="tel" id="advPhone" placeholder="e.g. 0977 123456"/>
+        </div>
+        <div class="form-row">
+          <label>Category</label>
+          <select id="advCategory">
+            <option value="fuel">Filling Station</option>
+            <option value="courier">Courier &amp; Logistics</option>
+            <option value="supermarket">Supermarket</option>
+            <option value="restaurant">Restaurant</option>
+            <option value="cafe">Café</option>
+            <option value="mechanic">Auto / Mechanic</option>
+            <option value="lodge">Lodge / Guesthouse</option>
+            <option value="momo">Mobile Money Agent</option>
+            <option value="other">Other Business</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>Tier</label>
+          <select id="advTier" onchange="onAdvTierChange()">
+            <option value="basic">Basic — K300/mo</option>
+            <option value="featured">Featured — K600/mo</option>
+            <option value="premium">Premium — K1000/mo</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>Monthly Price (ZMW)</label>
+          <input type="number" id="advPrice" min="0" placeholder="Auto-set from tier"/>
+        </div>
+        <div class="form-row">
+          <label>Zone</label>
+          <input type="text" id="advZone" placeholder="e.g. Lusaka Central"/>
+        </div>
+        <div class="form-row">
+          <label>Start Date</label>
+          <input type="date" id="advStart"/>
+        </div>
+        <div class="form-row">
+          <label>Duration (months)</label>
+          <select id="advDuration">
+            <option value="1">1 month</option>
+            <option value="3">3 months</option>
+            <option value="6">6 months</option>
+            <option value="12">1 year</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>Status</label>
+          <select id="advStatus">
+            <option value="active">Active</option>
+            <option value="pending">Pending</option>
+            <option value="expired">Expired</option>
+            <option value="rejected">Rejected</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>Payment Method</label>
+          <select id="advPayMethod">
+            <option value="">— Select —</option>
+            <option>Cash</option>
+            <option>Mobile Money</option>
+            <option>Bank Transfer</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <label>Offer / Description</label>
+        <input type="text" id="advOffer" placeholder="e.g. 10% off fuel for riders"/>
+      </div>
+      <div class="form-row">
+        <label>Notes (internal)</label>
+        <textarea id="advNotes" rows="2" placeholder="Optional internal notes…"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('advModal')">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="saveAdv()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Renew Advertiser -->
+<div class="overlay" id="renewAdvModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>🔄 Renew Advertiser Listing</h3>
+      <button class="close-btn" onclick="closeModal('renewAdvModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="renewAdvInfo" style="background:var(--surface2);border-radius:8px;padding:.75rem;margin-bottom:1rem;font-size:.85rem"></div>
+      <input type="hidden" id="renewAdvId"/>
+      <div class="form-grid">
+        <div class="form-row">
+          <label>Tier</label>
+          <select id="renewAdvTier" onchange="onRenewAdvTierChange()">
+            <option value="basic">Basic — K300/mo</option>
+            <option value="featured">Featured — K600/mo</option>
+            <option value="premium">Premium — K1000/mo</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>Monthly Price (ZMW)</label>
+          <input type="number" id="renewAdvPrice" min="0" placeholder="e.g. 300"/>
+        </div>
+        <div class="form-row">
+          <label>New Start Date</label>
+          <input type="date" id="renewAdvStart"/>
+        </div>
+        <div class="form-row">
+          <label>Duration (months)</label>
+          <select id="renewAdvDuration">
+            <option value="1">1 month</option>
+            <option value="3">3 months</option>
+            <option value="6">6 months</option>
+            <option value="12">1 year</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>Payment Method</label>
+          <select id="renewAdvPayMethod">
+            <option value="">— Select —</option>
+            <option>Cash</option>
+            <option>Mobile Money</option>
+            <option>Bank Transfer</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>Amount Paid (ZMW)</label>
+          <input type="number" id="renewAdvAmountPaid" min="0" placeholder="e.g. 300"/>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('renewAdvModal')">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="confirmRenewAdv()">🔄 Renew</button>
     </div>
   </div>
 </div>
@@ -941,7 +1115,7 @@
 // ══════════════════════════════════════════════════════
 //  CONSTANTS & STATE
 // ══════════════════════════════════════════════════════
-const KEYS={pw:'mc_password',subs:'mc_subscriptions',settings:'mc_admin_settings',fbConfig:'mc_fb_config',zones:'mc_zones_v2',advertisers:'mc_advertisers',pendingWrites:'mc_pending_writes',pendingAdvWrites:'mc_pending_adv_writes'};
+const KEYS={pw:'mc_password',subs:'mc_subscriptions',settings:'mc_admin_settings',fbConfig:'mc_fb_config',zones:'mc_zones_v2',advertisers:'mc_advertisers'};
 const DEFAULT_PW='admin123';
 const FB_PATH='motoconnect_zambia';
 let state={adminName:'Admin',warnDays:7};
@@ -956,25 +1130,6 @@ function getPassword(){return load(KEYS.pw,DEFAULT_PW);}
 function getSubs(){return load(KEYS.subs,[]);}
 function getSettings(){return load(KEYS.settings,{adminName:'Admin',warnDays:7});}
 function getAdvertisers(){return load(KEYS.advertisers,[]);}
-// Offline write queues — rehydrated from localStorage (not just an
-// in-memory array) so that an approval made while offline survives a
-// page reload, tab close, or dropped connection instead of being lost
-// the moment the JS context goes away before a reconnect can flush it.
-let _pendingWrites=load(KEYS.pendingWrites,[]);
-let _pendingAdvWrites=load(KEYS.pendingAdvWrites,[]);
-function _persistPendingWrites(){save(KEYS.pendingWrites,_pendingWrites);_updatePendingBadge();}
-function _persistPendingAdvWrites(){save(KEYS.pendingAdvWrites,_pendingAdvWrites);_updatePendingBadge();}
-function _updatePendingBadge(){
-  const badge=document.getElementById('pendingWritesBadge');
-  if(!badge)return;
-  const total=_pendingWrites.length+_pendingAdvWrites.length;
-  if(total>0){
-    badge.style.display='inline-block';
-    badge.textContent='⏳ '+total+' pending — tap to retry';
-  }else{
-    badge.style.display='none';
-  }
-}
 const ADV_CATEGORY_META={
   fuel:{label:'Filling Station',icon:'⛽'},
   courier:{label:'Courier & Logistics',icon:'📦'},
@@ -1478,7 +1633,7 @@ function daysUntil(s){if(!s)return null;const diff=Math.ceil((new Date(s)-new Da
 // ══════════════════════════════════════════════════════
 //  FIREBASE — intensified sync
 // ══════════════════════════════════════════════════════
-// (queue declared near KEYS/storage setup above, rehydrated from localStorage)
+let _pendingWrites=[];  // offline write queue
 let _listenerAttached=false;
 
 const HARDCODED_FB_CONFIG={
@@ -1520,27 +1675,24 @@ function setFbStatus(connected,msg){
 // this browser (fixed app name), so the round-trip only happens once per
 // device on first connect.
 async function _adminSignIn(password){
-  // If already signed in as the right user, reuse the session
-  await new Promise(res=>{
+  // Wait for Firebase Auth to restore any persisted session
+  const currentUser=await new Promise(res=>{
     const unsub=_fbAuth.onAuthStateChanged(u=>{unsub();res(u);});
   });
-  if(_fbAuth.currentUser && _fbAuth.currentUser.email===ADMIN_FIREBASE_EMAIL){
-    return _fbAuth.currentUser;
+  // Reuse persisted session if it matches the admin account
+  if(currentUser && currentUser.email===ADMIN_FIREBASE_EMAIL){
+    return currentUser;
   }
-  // Sign out any stale session first
+  // Sign out any stale session for a different account
   try{await _fbAuth.signOut();}catch(e){}
-  if(!password){
-    // No password available — prompt the user once
-    password=window.prompt('Enter your Firebase admin password to connect:');
-    if(!password) throw new Error('Password is required to connect to Firebase.');
-  }
+  // No persisted session — need a password to sign in
+  if(!password) throw new Error('No active Firebase session. Re-login to reconnect.');
   try{
     const cred=await _fbAuth.signInWithEmailAndPassword(ADMIN_FIREBASE_EMAIL, password);
     return cred.user;
   }catch(authErr){
-    // Provide a clear message for wrong-password vs other errors
     if(authErr.code==='auth/wrong-password'||authErr.code==='auth/invalid-credential'){
-      throw new Error('Firebase auth failed: incorrect password for '+ADMIN_FIREBASE_EMAIL+'. Check that your local admin password matches the Firebase account password.');
+      throw new Error('Firebase auth failed: incorrect password for '+ADMIN_FIREBASE_EMAIL+'.');
     }
     throw new Error('Firebase sign-in failed: '+authErr.message);
   }
@@ -1622,12 +1774,14 @@ function attachListeners(){
             const localTs=Math.max(
               s.approvedAt?new Date(s.approvedAt).getTime():0,
               s.rejectedAt?new Date(s.rejectedAt).getTime():0,
-              s.renewedAt?new Date(s.renewedAt).getTime():0
+              s.renewedAt?new Date(s.renewedAt).getTime():0,
+              s.updatedAt?new Date(s.updatedAt).getTime():0
             );
             const fbTs=Math.max(
               fbItem.approvedAt?new Date(fbItem.approvedAt).getTime():0,
               fbItem.rejectedAt?new Date(fbItem.rejectedAt).getTime():0,
-              fbItem.renewedAt?new Date(fbItem.renewedAt).getTime():0
+              fbItem.renewedAt?new Date(fbItem.renewedAt).getTime():0,
+              fbItem.updatedAt?new Date(fbItem.updatedAt).getTime():0
             );
             if(localTs>fbTs) merged[s.id]=s;
           }
@@ -1681,11 +1835,15 @@ function attachListeners(){
           else{
             const localTs=Math.max(
               a.approvedAt?new Date(a.approvedAt).getTime():0,
-              a.rejectedAt?new Date(a.rejectedAt).getTime():0
+              a.rejectedAt?new Date(a.rejectedAt).getTime():0,
+              a.renewedAt?new Date(a.renewedAt).getTime():0,
+              a.updatedAt?new Date(a.updatedAt).getTime():0
             );
             const fbTs=Math.max(
               fbItem.approvedAt?new Date(fbItem.approvedAt).getTime():0,
-              fbItem.rejectedAt?new Date(fbItem.rejectedAt).getTime():0
+              fbItem.rejectedAt?new Date(fbItem.rejectedAt).getTime():0,
+              fbItem.renewedAt?new Date(fbItem.renewedAt).getTime():0,
+              fbItem.updatedAt?new Date(fbItem.updatedAt).getTime():0
             );
             if(localTs>fbTs) merged[a.id]=a;
           }
@@ -1722,7 +1880,6 @@ async function fbWriteItem(item){
   if(!item||!item.id)return false;
   if(!_fbDb||!_fbConnected){
     _pendingWrites.push({type:'item',item});
-    _persistPendingWrites();
     console.warn('FB offline — queued write for',item.id);
     return false;
   }
@@ -1742,7 +1899,6 @@ async function fbWriteItem(item){
       throw new Error('Permission denied by Firebase. Auth: '+authUser+'. Try disconnecting and reconnecting.');
     }
     _pendingWrites.push({type:'item',item});
-    _persistPendingWrites();
     throw err;
   }
 }
@@ -1750,12 +1906,11 @@ async function fbWriteItem(item){
 // Same pattern as fbWriteItem, but for the advertisers node — kept as its
 // own queue/function (rather than merged into the subscriptions one) so a
 // failure or offline period in one never blocks or corrupts the other.
-// (queue declared near KEYS/storage setup above, rehydrated from localStorage)
+let _pendingAdvWrites=[];
 async function fbAdvWriteItem(item){
   if(!item||!item.id)return false;
   if(!_fbDb||!_fbConnected){
     _pendingAdvWrites.push(item);
-    _persistPendingAdvWrites();
     console.warn('FB offline — queued advertiser write for',item.id);
     return false;
   }
@@ -1768,7 +1923,6 @@ async function fbAdvWriteItem(item){
     setSyncDot('live');
     console.error('fbAdvWriteItem failed:',err);
     _pendingAdvWrites.push(item);
-    _persistPendingAdvWrites();
     throw err;
   }
 }
@@ -1778,7 +1932,6 @@ async function fbSave(items){
   save(KEYS.subs,items);
   if(!_fbDb||!_fbConnected){
     _pendingWrites.push({type:'full',items:[...items]});
-    _persistPendingWrites();
     console.warn('FB offline — queued full save');
     return false;
   }
@@ -1793,35 +1946,27 @@ async function fbSave(items){
     setSyncDot('live');
     console.error('fbSave failed:',err);
     _pendingWrites.push({type:'full',items:[...items]});
-    _persistPendingWrites();
     throw err;
   }
 }
 
 // Flush queued writes when connection restores
 async function flushPendingWrites(){
-  if(!_fbDb||!_fbConnected){
-    showFbMsg('⚠️ Still offline — will retry automatically once reconnected.','alert-warn');
-    return;
-  }
   if(_pendingAdvWrites.length){
     const advQueue=[..._pendingAdvWrites];
     _pendingAdvWrites=[];
-    _persistPendingAdvWrites();
     try{
       for(const item of advQueue){
         await _fbDb.ref(FB_PATH+'/advertisers/'+item.id).set(item);
       }
     }catch(err){
       _pendingAdvWrites=[...advQueue,..._pendingAdvWrites];
-      _persistPendingAdvWrites();
       console.error('Advertiser flush failed:',err);
     }
   }
   if(!_pendingWrites.length)return;
   const queue=[..._pendingWrites];
   _pendingWrites=[];
-  _persistPendingWrites();
   console.log('Flushing',queue.length,'pending writes…');
   setSyncDot('syncing');
   try{
@@ -1841,7 +1986,6 @@ async function flushPendingWrites(){
   }catch(err){
     setSyncDot('live');
     _pendingWrites=[...queue,..._pendingWrites]; // put back
-    _persistPendingWrites();
     console.error('Flush failed:',err);
   }
 }
@@ -1933,6 +2077,7 @@ function showPage(id,navEl){
   else if(id==='applications')renderApplications();
   else if(id==='subscriptions')renderSubscriptions();
   else if(id==='renewals')renderRenewals();
+  else if(id==='advertisers')renderAdvertisers();
   else if(id==='settings')loadSettingsPage();
 }
 
@@ -1965,7 +2110,17 @@ function vehicleIcon(type){
 // ══════════════════════════════════════════════════════
 //  STATS
 // ══════════════════════════════════════════════════════
-function refreshAll(){renderDashboard();renderApplications();renderSubscriptions();renderRenewals();renderAdvertisers();updateBadges();updateAdvBadge();}
+function refreshAll(){
+  updateBadges();updateAdvBadge();
+  const activePage=document.querySelector('.page.active');
+  const pid=activePage?activePage.id:'';
+  if(pid==='page-dashboard')renderDashboard();
+  else if(pid==='page-applications')renderApplications();
+  else if(pid==='page-subscriptions')renderSubscriptions();
+  else if(pid==='page-renewals')renderRenewals();
+  else if(pid==='page-advertisers')renderAdvertisers();
+  else renderDashboard();
+}
 
 function getSubStats(){
   const subs=getSubs();
@@ -2040,7 +2195,7 @@ function renderApplications(){
   const search=(document.getElementById('appSearch')?.value||'').toLowerCase();
   const fStatus=document.getElementById('appFilterStatus')?.value||'';
   const fType=document.getElementById('appFilterType')?.value||'';
-  let apps=getSubs().filter(s=>s.isApplication||s.status==='pending');
+  let apps=getSubs().filter(s=>s.status==='pending'||(s.isApplication===true&&s.status==='rejected'));
   if(search)apps=apps.filter(a=>(a.name+(a.phone||'')+(a.ref||'')).toLowerCase().includes(search));
   if(fStatus)apps=apps.filter(a=>a.status===fStatus);
   if(fType)apps=apps.filter(a=>a.type===fType);
@@ -2204,12 +2359,14 @@ function confirmApprove(){
     status:'active',price,plan,duration,start,
     expiry:toDateStr(expDate),
     availability:'available',
+    isApplication:false,
     notes:notes||subs[i].notes,
     paymentMethod:payMethod||subs[i].paymentMethod||'',
     amountPaid:amountPaid||subs[i].amountPaid||0,
     paymentDate:todayStr(),
     approvedAt:now,
-    activatedBy:state.adminName||'Admin'
+    activatedBy:state.adminName||'Admin',
+    updatedAt:now
   };
   // If admin accepted rider custom zone(s), permanently add them to zones list
   const acceptCustom=document.getElementById('acceptCustomZone')?.checked;
@@ -2236,18 +2393,20 @@ function confirmApprove(){
 }
 
 function rejectApp(appId){
+  const subs=getSubs();
+  const i=subs.findIndex(s=>s.id===appId);
+  if(i<0)return;
   document.getElementById('confirmMsg').textContent='Reject this application? The rider will need to re-apply.';
   document.getElementById('confirmOkBtn').textContent='Reject';
+  const captured={subs:[...subs],i};
   document.getElementById('confirmOkBtn').onclick=()=>{
-    const subs=getSubs();
-    const i=subs.findIndex(s=>s.id===appId);
-    if(i>-1){subs[i]={...subs[i],status:'rejected',rejectedAt:new Date().toISOString()};}
-    save(KEYS.subs,subs);
+    captured.subs[captured.i]={...captured.subs[captured.i],status:'rejected',rejectedAt:new Date().toISOString()};
+    save(KEYS.subs,captured.subs);
     closeModal('confirmModal');
     refreshAll();
-    if(i>-1) fbWriteItem(subs[i])
-      .then(()=>showFbMsg('\u2705 Rejected and synced.','alert-ok'))
-      .catch(()=>showFbMsg('\u26a0\ufe0f Rejected locally. Will retry.','alert-warn'));
+    fbWriteItem(captured.subs[captured.i])
+      .then(()=>showFbMsg('✅ Rejected and synced.','alert-ok'))
+      .catch(()=>showFbMsg('⚠️ Rejected locally. Will retry.','alert-warn'));
   };
   openModal('confirmModal');
 }
@@ -2258,21 +2417,25 @@ function rejectApp(appId){
 function renderAdvertisers(){
   const search=(document.getElementById('advSearch')?.value||'').toLowerCase();
   const fStatus=document.getElementById('advFilterStatus')?.value||'';
+  const fCat=document.getElementById('advFilterCategory')?.value||'';
   let ads=getAdvertisers();
   if(search)ads=ads.filter(a=>(a.name+(a.phone||'')+(a.ref||'')).toLowerCase().includes(search));
   if(fStatus)ads=ads.filter(a=>a.status===fStatus);
+  if(fCat)ads=ads.filter(a=>(a.category||'other')===fCat);
   ads=ads.slice().reverse();
 
   const el=document.getElementById('advQueueList');
   if(!el)return;
   if(!ads.length){
-    el.innerHTML='<div class="empty"><div class="empty-icon">📣</div><p>No advertiser listings found</p><p style="font-size:.75rem;margin-top:.3rem">Listings submitted from the public MotoConnect "Advertise" page appear here.</p></div>';
+    el.innerHTML='<div class="empty"><div class="empty-icon">📣</div><p>No advertiser listings found</p><p style="font-size:.75rem;margin-top:.3rem">Listings submitted from the public MotoConnect "Advertise" page appear here, or add one manually.</p></div>';
     return;
   }
 
   el.innerHTML=ads.map(a=>{
     const dateStr=a.created?new Date(a.created).toLocaleDateString('en-ZM',{day:'numeric',month:'short',year:'numeric'}):'—';
     const meta=ADV_CATEGORY_META[a.category]||ADV_CATEGORY_META.other;
+    const d=daysUntil(a.expiry);
+    const expBadge=a.status==='active'&&a.expiry?(d!==null&&d<0?'<span class="badge badge-expired">Expired</span>':d!==null&&d<=state.warnDays?`<span class="badge badge-expiring">${d===0?'Today':d+'d'}</span>`:''):'';
     return`<div class="app-card ${a.status||'pending'}">
       <div class="app-icon">${meta.icon}</div>
       <div class="app-info">
@@ -2280,10 +2443,12 @@ function renderAdvertisers(){
         <div class="app-meta">
           ${meta.label} &nbsp;·&nbsp; 📞 ${esc(a.phone||'—')} &nbsp;·&nbsp; Zone: ${esc(a.zone||'—')}<br>
           Tier: <span class="pill-plan">${esc((a.tier||'basic').toUpperCase())}</span> &nbsp;·&nbsp; K${a.price||ADV_TIER_PRICE[a.tier]||0}/mo &nbsp;·&nbsp; Applied: ${dateStr}
+          ${a.expiry?`<br>📅 Expiry: <strong>${fmtDate(a.expiry)}</strong> ${expBadge}`:''}
           ${a.zoneCustom?`<br>📍 Custom region: <strong style="color:var(--warn)">${esc(a.zoneCustom)}</strong> <span style="font-size:.68rem;background:#fff7ed;border:1px solid #fcd34d;color:#92400e;padding:.1rem .35rem;border-radius:4px;font-weight:700">UNRECOGNISED</span>`:''}
           ${a.offer?`<br>🏷️ Offer: ${esc(a.offer)}`:''}
           ${a.voucherEnabled?`<br>🎁 Rider reward: ${esc(a.voucherOffer||'—')} (${a.voucherModel==='spend'?'after K'+a.voucherSpendTarget+' spend':'every '+a.voucherVisitTarget+' visits'})`:''}
           ${a.txnId?`<br>💳 Txn ID: <code style="background:#d1fae5;color:#065f46;padding:.1rem .35rem;border-radius:4px;font-size:.78rem">${esc(a.txnId)}</code>`:''}
+          ${a.notes?`<br><em style="color:var(--muted)">${esc(a.notes)}</em>`:''}
           ${a.logoDataUrl?`<div style="margin-top:.5rem"><img src="${a.logoDataUrl}" style="width:60px;height:60px;object-fit:cover;border-radius:6px;border:1px solid var(--border)" alt="Business logo"></div>`:''}
         </div>
         <span class="app-ref">${esc(a.ref||a.id)}</span>
@@ -2293,8 +2458,17 @@ function renderAdvertisers(){
           <button class="btn btn-success btn-sm" onclick="openApproveAdvModal('${a.id}')">✅ Approve</button>
           <button class="btn btn-danger btn-sm" onclick="rejectAdv('${a.id}')">✗ Reject</button>
         `:''}
-        ${a.status==='active'?`<span class="badge badge-active">Approved</span>`:''}
+        ${a.status==='active'?`
+          <button class="btn btn-warn btn-sm" onclick="openRenewAdvModal('${a.id}')">🔄 Renew</button>
+          <span class="badge badge-active">Active</span>
+        `:''}
+        ${a.status==='expired'?`
+          <button class="btn btn-warn btn-sm" onclick="openRenewAdvModal('${a.id}')">🔄 Renew</button>
+          <span class="badge badge-expired">Expired</span>
+        `:''}
         ${a.status==='rejected'?`<span class="badge badge-rejected">Rejected</span>`:''}
+        <button class="btn btn-ghost btn-sm" onclick="openEditAdvModal('${a.id}')">✏️ Edit</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteAdv('${a.id}')">🗑️</button>
       </div>
     </div>`;
   }).join('');
@@ -2316,7 +2490,10 @@ function openApproveAdvModal(advId){
   const a=getAdvertisers().find(x=>x.id===advId);
   if(!a)return;
   document.getElementById('approveAdvId').value=advId;
-  document.getElementById('approveAdvPrice').value=a.price||ADV_TIER_PRICE[a.tier]||0;
+  const advTierPre=a.tier||'basic';
+  const approveAdvTierEl=document.getElementById('approveAdvTier');
+  if(approveAdvTierEl)approveAdvTierEl.value=advTierPre;
+  document.getElementById('approveAdvPrice').value=a.price||ADV_TIER_PRICE[advTierPre]||0;
   document.getElementById('approveAdvDuration').value='1';
   document.getElementById('approveAdvStart').value=todayStr();
   const infoEl=document.getElementById('approveAdvInfo');
@@ -2343,7 +2520,8 @@ function confirmApproveAdv(){
   if(i<0)return;
   const expDate=new Date(start);
   expDate.setMonth(expDate.getMonth()+parseInt(duration));
-  ads[i]={...ads[i],status:'active',price,duration,start,expiry:toDateStr(expDate),approvedAt:new Date().toISOString(),activatedBy:state.adminName||'Admin'};
+  const advTierVal=document.getElementById('approveAdvTier')?.value||ads[i].tier||'basic';
+  ads[i]={...ads[i],status:'active',tier:advTierVal,price,duration,start,expiry:toDateStr(expDate),approvedAt:new Date().toISOString(),activatedBy:state.adminName||'Admin',updatedAt:new Date().toISOString()};
   // Promote any zone the advertiser typed in (rather than picked) to the
   // official zones list, same as for rider applications.
   const acceptCustom=document.getElementById('acceptAdvCustomZone')?.checked;
@@ -2365,20 +2543,199 @@ function confirmApproveAdv(){
 }
 
 function rejectAdv(advId){
+  const ads=getAdvertisers();
+  const i=ads.findIndex(a=>a.id===advId);
+  if(i<0)return;
   document.getElementById('confirmMsg').textContent='Reject this advertiser listing? They will need to re-apply.';
   document.getElementById('confirmOkBtn').textContent='Reject';
+  const captured={ads:[...ads],i};
   document.getElementById('confirmOkBtn').onclick=()=>{
-    const ads=getAdvertisers();
-    const i=ads.findIndex(a=>a.id===advId);
-    if(i>-1){ads[i]={...ads[i],status:'rejected',rejectedAt:new Date().toISOString()};}
+    captured.ads[captured.i]={...captured.ads[captured.i],status:'rejected',rejectedAt:new Date().toISOString()};
+    save(KEYS.advertisers,captured.ads);
+    closeModal('confirmModal');
+    refreshAll();
+    fbAdvWriteItem(captured.ads[captured.i])
+      .then(()=>showFbMsg('✅ Rejected and synced.','alert-ok'))
+      .catch(()=>showFbMsg('⚠️ Rejected locally. Will retry.','alert-warn'));
+  };
+  openModal('confirmModal');
+}
+
+// ══════════════════════════════════════════════════════
+//  ADVERTISER ADD / EDIT / DELETE / RENEW
+// ══════════════════════════════════════════════════════
+function onAdvTierChange(){
+  const tier=document.getElementById('advTier').value;
+  document.getElementById('advPrice').value=ADV_TIER_PRICE[tier]||0;
+}
+function onRenewAdvTierChange(){
+  const tier=document.getElementById('renewAdvTier').value;
+  document.getElementById('renewAdvPrice').value=ADV_TIER_PRICE[tier]||0;
+  document.getElementById('renewAdvAmountPaid').value=ADV_TIER_PRICE[tier]||0;
+}
+
+function openAddAdvModal(){
+  document.getElementById('advModalTitle').textContent='Add Advertiser';
+  document.getElementById('advEditId').value='';
+  document.getElementById('advName').value='';
+  document.getElementById('advPhone').value='';
+  document.getElementById('advCategory').value='other';
+  document.getElementById('advTier').value='basic';
+  document.getElementById('advPrice').value=ADV_TIER_PRICE.basic;
+  document.getElementById('advZone').value='';
+  document.getElementById('advStart').value=todayStr();
+  document.getElementById('advDuration').value='1';
+  document.getElementById('advStatus').value='active';
+  document.getElementById('advPayMethod').value='';
+  document.getElementById('advOffer').value='';
+  document.getElementById('advNotes').value='';
+  openModal('advModal');
+}
+
+function openEditAdvModal(advId){
+  const a=getAdvertisers().find(x=>x.id===advId);
+  if(!a)return;
+  document.getElementById('advModalTitle').textContent='Edit Advertiser';
+  document.getElementById('advEditId').value=advId;
+  document.getElementById('advName').value=a.name||'';
+  document.getElementById('advPhone').value=a.phone||'';
+  document.getElementById('advCategory').value=a.category||'other';
+  document.getElementById('advTier').value=a.tier||'basic';
+  document.getElementById('advPrice').value=a.price||ADV_TIER_PRICE[a.tier]||0;
+  document.getElementById('advZone').value=a.zone||'';
+  document.getElementById('advStart').value=a.start||todayStr();
+  document.getElementById('advDuration').value=a.duration||'1';
+  document.getElementById('advStatus').value=a.status||'active';
+  document.getElementById('advPayMethod').value=a.paymentMethod||'';
+  document.getElementById('advOffer').value=a.offer||'';
+  document.getElementById('advNotes').value=a.notes||'';
+  openModal('advModal');
+}
+
+function saveAdv(){
+  const id=document.getElementById('advEditId').value;
+  const name=document.getElementById('advName').value.trim();
+  const phone=document.getElementById('advPhone').value.trim();
+  if(!name||!phone){alert('Business name and phone are required.');return;}
+  const tier=document.getElementById('advTier').value;
+  const price=parseFloat(document.getElementById('advPrice').value)||ADV_TIER_PRICE[tier]||0;
+  const start=document.getElementById('advStart').value||todayStr();
+  const duration=document.getElementById('advDuration').value;
+  const status=document.getElementById('advStatus').value;
+  const expDate=new Date(start);
+  expDate.setMonth(expDate.getMonth()+parseInt(duration));
+  const ads=getAdvertisers();
+  if(id){
+    // Edit
+    const i=ads.findIndex(a=>a.id===id);
+    if(i<0)return;
+    ads[i]={...ads[i],name,phone,
+      category:document.getElementById('advCategory').value,
+      tier,price,
+      zone:document.getElementById('advZone').value.trim(),
+      start,duration,
+      expiry:toDateStr(expDate),
+      status,
+      paymentMethod:document.getElementById('advPayMethod').value,
+      offer:document.getElementById('advOffer').value.trim(),
+      notes:document.getElementById('advNotes').value.trim(),
+      updatedAt:new Date().toISOString()
+    };
+    save(KEYS.advertisers,ads);
+    refreshAll();
+    closeModal('advModal');
+    fbAdvWriteItem(ads[i])
+      .then(()=>showFbMsg('✅ Advertiser updated and synced!','alert-ok'))
+      .catch(err=>showFbMsg('⚠️ Updated locally. Firebase: '+err.message,'alert-warn'));
+  } else {
+    // Add new
+    const newAdv={
+      id:uid(),ref:'ADV-'+Date.now().toString(36).toUpperCase(),
+      name,phone,
+      category:document.getElementById('advCategory').value,
+      tier,price,
+      zone:document.getElementById('advZone').value.trim(),
+      start,duration,
+      expiry:toDateStr(expDate),
+      status,
+      paymentMethod:document.getElementById('advPayMethod').value,
+      offer:document.getElementById('advOffer').value.trim(),
+      notes:document.getElementById('advNotes').value.trim(),
+      created:new Date().toISOString(),
+      activatedBy:state.adminName||'Admin'
+    };
+    ads.push(newAdv);
+    save(KEYS.advertisers,ads);
+    refreshAll();
+    closeModal('advModal');
+    fbAdvWriteItem(newAdv)
+      .then(()=>showFbMsg('✅ Advertiser added and synced!','alert-ok'))
+      .catch(err=>showFbMsg('⚠️ Added locally. Firebase: '+err.message,'alert-warn'));
+  }
+}
+
+function deleteAdv(advId){
+  document.getElementById('confirmMsg').textContent='Permanently delete this advertiser? This cannot be undone.';
+  document.getElementById('confirmOkBtn').textContent='Delete';
+  document.getElementById('confirmOkBtn').onclick=async()=>{
+    let ads=getAdvertisers().filter(a=>a.id!==advId);
     save(KEYS.advertisers,ads);
     closeModal('confirmModal');
     refreshAll();
-    if(i>-1) fbAdvWriteItem(ads[i])
-      .then(()=>showFbMsg('\u2705 Rejected and synced.','alert-ok'))
-      .catch(()=>showFbMsg('\u26a0\ufe0f Rejected locally. Will retry.','alert-warn'));
+    // Remove from Firebase
+    if(_fbDb&&_fbConnected){
+      try{
+        setSyncDot('syncing');
+        await _fbDb.ref(FB_PATH+'/advertisers/'+advId).remove();
+        setSyncDot('live');
+        showFbMsg('✅ Deleted and synced.','alert-ok');
+      }catch(err){
+        setSyncDot('live');
+        showFbMsg('⚠️ Deleted locally. Firebase: '+err.message,'alert-warn');
+      }
+    }
   };
   openModal('confirmModal');
+}
+
+function openRenewAdvModal(advId){
+  const a=getAdvertisers().find(x=>x.id===advId);
+  if(!a)return;
+  document.getElementById('renewAdvId').value=advId;
+  const tier=a.tier||'basic';
+  document.getElementById('renewAdvTier').value=tier;
+  document.getElementById('renewAdvPrice').value=a.price||ADV_TIER_PRICE[tier]||0;
+  document.getElementById('renewAdvStart').value=todayStr();
+  document.getElementById('renewAdvDuration').value='1';
+  document.getElementById('renewAdvPayMethod').value=a.paymentMethod||'';
+  document.getElementById('renewAdvAmountPaid').value=a.price||ADV_TIER_PRICE[tier]||0;
+  const meta=ADV_CATEGORY_META[a.category]||ADV_CATEGORY_META.other;
+  document.getElementById('renewAdvInfo').innerHTML=`<strong>${esc(a.name)}</strong> · ${meta.icon} ${esc(meta.label)}<br><span style="font-size:.78rem;color:var(--muted)">📞 ${esc(a.phone||'—')} &nbsp;·&nbsp; Zone: ${esc(a.zone||'—')} &nbsp;·&nbsp; Current expiry: <strong>${fmtDate(a.expiry)}</strong></span>`;
+  openModal('renewAdvModal');
+}
+
+function confirmRenewAdv(){
+  const advId=document.getElementById('renewAdvId').value;
+  const tier=document.getElementById('renewAdvTier').value;
+  const price=parseFloat(document.getElementById('renewAdvPrice').value)||0;
+  const start=document.getElementById('renewAdvStart').value||todayStr();
+  const duration=document.getElementById('renewAdvDuration').value;
+  const payMethod=document.getElementById('renewAdvPayMethod').value;
+  const amountPaid=parseFloat(document.getElementById('renewAdvAmountPaid').value)||0;
+  if(!price){alert('Monthly price is required.');return;}
+  const ads=getAdvertisers();
+  const i=ads.findIndex(a=>a.id===advId);
+  if(i<0)return;
+  const expDate=new Date(start);
+  expDate.setMonth(expDate.getMonth()+parseInt(duration));
+  ads[i]={...ads[i],tier,price,start,duration,expiry:toDateStr(expDate),status:'active',
+    paymentMethod:payMethod,amountPaid,renewedAt:new Date().toISOString(),renewedBy:state.adminName||'Admin'};
+  save(KEYS.advertisers,ads);
+  refreshAll();
+  closeModal('renewAdvModal');
+  fbAdvWriteItem(ads[i])
+    .then(()=>showFbMsg('✅ Advertiser renewed and synced!','alert-ok'))
+    .catch(err=>showFbMsg('⚠️ Renewed locally. Firebase: '+err.message,'alert-warn'));
 }
 
 // ══════════════════════════════════════════════════════
@@ -2526,7 +2883,7 @@ function saveSub(){
   save(KEYS.subs,subs);
   // Write only the changed item (or do full save for new additions)
   const changedItem=editId?subs.find(s=>s.id===editId):subs[subs.length-1];
-  if(changedItem) fbWriteItem(changedItem).catch(()=>{_pendingWrites.push({type:'item',item:changedItem});_persistPendingWrites();});
+  if(changedItem) fbWriteItem(changedItem).catch(()=>_pendingWrites.push({type:'item',item:changedItem}));
   closeModal('subModal');
   refreshAll();
 }
@@ -2535,10 +2892,20 @@ function deleteSub(id){
   document.getElementById('confirmMsg').textContent='Delete this rider? This cannot be undone.';
   document.getElementById('confirmOkBtn').textContent='Delete';
   document.getElementById('confirmOkBtn').onclick=async()=>{
-    const remaining=getSubs().filter(s=>s.id!==id);
-    try{ await fbSave(remaining); }catch(e){ /* queued internally */ }
+    save(KEYS.subs,getSubs().filter(s=>s.id!==id));
     closeModal('confirmModal');
     refreshAll();
+    if(_fbDb&&_fbConnected){
+      try{
+        setSyncDot('syncing');
+        await _fbDb.ref(FB_PATH+'/subscriptions/'+id).remove();
+        setSyncDot('live');
+        showFbMsg('✅ Rider deleted and synced.','alert-ok');
+      }catch(err){
+        setSyncDot('live');
+        showFbMsg('⚠️ Deleted locally. Firebase: '+err.message,'alert-warn');
+      }
+    }
   };
   openModal('confirmModal');
 }
@@ -2585,8 +2952,8 @@ function openRenewModal(id){
   document.getElementById('renewPrice').value=s.price||'';
   document.getElementById('renewStart').value=todayStr();
   document.getElementById('renewDuration').value='1';
-  document.getElementById('renewPayMethod').value='';
-  document.getElementById('renewAmountPaid').value='';
+  document.getElementById('renewPayMethod').value=s.paymentMethod||'';
+  document.getElementById('renewAmountPaid').value=s.price||'';
   document.getElementById('renewRiderInfo').innerHTML=`
     <strong>${esc(s.name)}</strong> · ${vehicleIcon(s.type)} ${esc(s.type||'')}<br>
     <span style="color:var(--muted);font-size:.8rem">Current expiry: ${fmtDate(s.expiry)} · Plan: ${esc(s.plan||'—')}</span>
@@ -2612,14 +2979,11 @@ function confirmRenew(){
     paymentMethod:payMethod||subs[i].paymentMethod,amountPaid:amountPaid||subs[i].amountPaid,
     paymentDate:todayStr(),renewedAt:new Date().toISOString()};
   save(KEYS.subs,subs);
-  fbWriteItem(subs[i]).catch(e=>{
-    _pendingWrites.push({type:'item',item:subs[i]});
-    _persistPendingWrites();
-    showFbMsg('⚠️ Renewed locally. Firebase sync will retry when online.','alert-warn');
-  });
   closeModal('renewModal');
   refreshAll();
-  showFbMsg('✅ Subscription renewed until '+fmtDate(toDateStr(expDate)),'alert-ok');
+  fbWriteItem(subs[i])
+    .then(()=>showFbMsg('✅ Renewed until '+fmtDate(toDateStr(expDate))+' — synced!','alert-ok'))
+    .catch(()=>showFbMsg('⚠️ Renewed locally until '+fmtDate(toDateStr(expDate))+'. Will sync when online.','alert-warn'));
 }
 
 // ══════════════════════════════════════════════════════
@@ -2750,19 +3114,17 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'){document.querySelec
   }
 })();
 
-// Auto-reconnect Firebase on load (only when served over http/https)
+// Auto-connect Firebase on page load using persisted Auth session (no password needed)
 (function(){
   const isHosted=location.protocol==='https:'||location.protocol==='http:';
-  window.addEventListener('DOMContentLoaded',()=>{_updatePendingBadge();});
   if(!isHosted)return;
   const cfg=getSavedFbConfig();
   if(cfg){
     window.addEventListener('DOMContentLoaded',()=>{
-      setTimeout(()=>{
-        const inp=document.getElementById('fbConfigInput');
-        if(inp)inp.value=JSON.stringify(cfg,null,2);
-        connectFirebase(JSON.stringify(cfg));
-      },300);
+      const inp=document.getElementById('fbConfigInput');
+      if(inp)inp.value=JSON.stringify(cfg,null,2);
+      // Attempt silent connect — succeeds if Firebase Auth session is still valid
+      connectFirebase(JSON.stringify(cfg)); // no password: relies on persisted session
     });
   }
 })();

@@ -307,6 +307,7 @@
     <div class="topbar-right">
       <div class="sync-dot" id="syncDot" title="Firebase connection status"></div>
       <span class="sync-label" id="syncLabel">Not connected</span>
+      <span id="pendingWritesBadge" title="Writes made while offline, waiting to sync to Firebase" style="display:none;background:#fef3c7;color:#92400e;border:1px solid #fcd34d;border-radius:999px;padding:.1rem .55rem;font-size:.7rem;font-weight:700;margin-left:.4rem;cursor:pointer" onclick="flushPendingWrites()">⏳ 0 pending</span>
     </div>
   </div>
 
@@ -940,7 +941,7 @@
 // ══════════════════════════════════════════════════════
 //  CONSTANTS & STATE
 // ══════════════════════════════════════════════════════
-const KEYS={pw:'mc_password',subs:'mc_subscriptions',settings:'mc_admin_settings',fbConfig:'mc_fb_config',zones:'mc_zones_v2',advertisers:'mc_advertisers'};
+const KEYS={pw:'mc_password',subs:'mc_subscriptions',settings:'mc_admin_settings',fbConfig:'mc_fb_config',zones:'mc_zones_v2',advertisers:'mc_advertisers',pendingWrites:'mc_pending_writes',pendingAdvWrites:'mc_pending_adv_writes'};
 const DEFAULT_PW='admin123';
 const FB_PATH='motoconnect_zambia';
 let state={adminName:'Admin',warnDays:7};
@@ -955,6 +956,25 @@ function getPassword(){return load(KEYS.pw,DEFAULT_PW);}
 function getSubs(){return load(KEYS.subs,[]);}
 function getSettings(){return load(KEYS.settings,{adminName:'Admin',warnDays:7});}
 function getAdvertisers(){return load(KEYS.advertisers,[]);}
+// Offline write queues — rehydrated from localStorage (not just an
+// in-memory array) so that an approval made while offline survives a
+// page reload, tab close, or dropped connection instead of being lost
+// the moment the JS context goes away before a reconnect can flush it.
+let _pendingWrites=load(KEYS.pendingWrites,[]);
+let _pendingAdvWrites=load(KEYS.pendingAdvWrites,[]);
+function _persistPendingWrites(){save(KEYS.pendingWrites,_pendingWrites);_updatePendingBadge();}
+function _persistPendingAdvWrites(){save(KEYS.pendingAdvWrites,_pendingAdvWrites);_updatePendingBadge();}
+function _updatePendingBadge(){
+  const badge=document.getElementById('pendingWritesBadge');
+  if(!badge)return;
+  const total=_pendingWrites.length+_pendingAdvWrites.length;
+  if(total>0){
+    badge.style.display='inline-block';
+    badge.textContent='⏳ '+total+' pending — tap to retry';
+  }else{
+    badge.style.display='none';
+  }
+}
 const ADV_CATEGORY_META={
   fuel:{label:'Filling Station',icon:'⛽'},
   courier:{label:'Courier & Logistics',icon:'📦'},
@@ -1458,7 +1478,7 @@ function daysUntil(s){if(!s)return null;const diff=Math.ceil((new Date(s)-new Da
 // ══════════════════════════════════════════════════════
 //  FIREBASE — intensified sync
 // ══════════════════════════════════════════════════════
-let _pendingWrites=[];  // offline write queue
+// (queue declared near KEYS/storage setup above, rehydrated from localStorage)
 let _listenerAttached=false;
 
 const HARDCODED_FB_CONFIG={
@@ -1702,6 +1722,7 @@ async function fbWriteItem(item){
   if(!item||!item.id)return false;
   if(!_fbDb||!_fbConnected){
     _pendingWrites.push({type:'item',item});
+    _persistPendingWrites();
     console.warn('FB offline — queued write for',item.id);
     return false;
   }
@@ -1721,6 +1742,7 @@ async function fbWriteItem(item){
       throw new Error('Permission denied by Firebase. Auth: '+authUser+'. Try disconnecting and reconnecting.');
     }
     _pendingWrites.push({type:'item',item});
+    _persistPendingWrites();
     throw err;
   }
 }
@@ -1728,11 +1750,12 @@ async function fbWriteItem(item){
 // Same pattern as fbWriteItem, but for the advertisers node — kept as its
 // own queue/function (rather than merged into the subscriptions one) so a
 // failure or offline period in one never blocks or corrupts the other.
-let _pendingAdvWrites=[];
+// (queue declared near KEYS/storage setup above, rehydrated from localStorage)
 async function fbAdvWriteItem(item){
   if(!item||!item.id)return false;
   if(!_fbDb||!_fbConnected){
     _pendingAdvWrites.push(item);
+    _persistPendingAdvWrites();
     console.warn('FB offline — queued advertiser write for',item.id);
     return false;
   }
@@ -1745,6 +1768,7 @@ async function fbAdvWriteItem(item){
     setSyncDot('live');
     console.error('fbAdvWriteItem failed:',err);
     _pendingAdvWrites.push(item);
+    _persistPendingAdvWrites();
     throw err;
   }
 }
@@ -1754,6 +1778,7 @@ async function fbSave(items){
   save(KEYS.subs,items);
   if(!_fbDb||!_fbConnected){
     _pendingWrites.push({type:'full',items:[...items]});
+    _persistPendingWrites();
     console.warn('FB offline — queued full save');
     return false;
   }
@@ -1768,27 +1793,35 @@ async function fbSave(items){
     setSyncDot('live');
     console.error('fbSave failed:',err);
     _pendingWrites.push({type:'full',items:[...items]});
+    _persistPendingWrites();
     throw err;
   }
 }
 
 // Flush queued writes when connection restores
 async function flushPendingWrites(){
+  if(!_fbDb||!_fbConnected){
+    showFbMsg('⚠️ Still offline — will retry automatically once reconnected.','alert-warn');
+    return;
+  }
   if(_pendingAdvWrites.length){
     const advQueue=[..._pendingAdvWrites];
     _pendingAdvWrites=[];
+    _persistPendingAdvWrites();
     try{
       for(const item of advQueue){
         await _fbDb.ref(FB_PATH+'/advertisers/'+item.id).set(item);
       }
     }catch(err){
       _pendingAdvWrites=[...advQueue,..._pendingAdvWrites];
+      _persistPendingAdvWrites();
       console.error('Advertiser flush failed:',err);
     }
   }
   if(!_pendingWrites.length)return;
   const queue=[..._pendingWrites];
   _pendingWrites=[];
+  _persistPendingWrites();
   console.log('Flushing',queue.length,'pending writes…');
   setSyncDot('syncing');
   try{
@@ -1808,6 +1841,7 @@ async function flushPendingWrites(){
   }catch(err){
     setSyncDot('live');
     _pendingWrites=[...queue,..._pendingWrites]; // put back
+    _persistPendingWrites();
     console.error('Flush failed:',err);
   }
 }
@@ -2492,7 +2526,7 @@ function saveSub(){
   save(KEYS.subs,subs);
   // Write only the changed item (or do full save for new additions)
   const changedItem=editId?subs.find(s=>s.id===editId):subs[subs.length-1];
-  if(changedItem) fbWriteItem(changedItem).catch(()=>_pendingWrites.push({type:'item',item:changedItem}));
+  if(changedItem) fbWriteItem(changedItem).catch(()=>{_pendingWrites.push({type:'item',item:changedItem});_persistPendingWrites();});
   closeModal('subModal');
   refreshAll();
 }
@@ -2580,6 +2614,7 @@ function confirmRenew(){
   save(KEYS.subs,subs);
   fbWriteItem(subs[i]).catch(e=>{
     _pendingWrites.push({type:'item',item:subs[i]});
+    _persistPendingWrites();
     showFbMsg('⚠️ Renewed locally. Firebase sync will retry when online.','alert-warn');
   });
   closeModal('renewModal');
@@ -2718,6 +2753,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'){document.querySelec
 // Auto-reconnect Firebase on load (only when served over http/https)
 (function(){
   const isHosted=location.protocol==='https:'||location.protocol==='http:';
+  window.addEventListener('DOMContentLoaded',()=>{_updatePendingBadge();});
   if(!isHosted)return;
   const cfg=getSavedFbConfig();
   if(cfg){

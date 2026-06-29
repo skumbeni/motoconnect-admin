@@ -231,8 +231,13 @@
     <h1>MotoConnect Zambia</h1>
     <p>Admin Panel — Subscription Management</p>
     <div class="input-wrap">
-      <label>Password</label>
+      <label>Panel Password</label>
       <input type="password" id="loginPw" placeholder="Enter admin password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()"/>
+    </div>
+    <div class="input-wrap" id="fbPwWrap" style="display:none">
+      <label>Firebase Password <span style="font-weight:400;color:var(--muted);font-size:.7rem">(skumbeni@gmail.com)</span></label>
+      <input type="password" id="loginFbPw" placeholder="Firebase Auth password" autocomplete="off" onkeydown="if(event.key==='Enter')doLogin()"/>
+      <div style="font-size:.72rem;color:var(--muted);margin-top:.3rem">Only needed first time on this device.</div>
     </div>
     <button class="btn btn-primary" onclick="doLogin()">🔐 Sign In</button>
     <div id="loginErr" style="display:none" class="alert alert-err">Incorrect password. Try again.</div>
@@ -622,6 +627,16 @@
         <div id="zoneWaGroupList"></div>
       </div>
 
+      <div class="settings-card">
+        <h3>🔑 Firebase Auth Password</h3>
+        <p style="font-size:.82rem;color:var(--muted);margin-bottom:.75rem">The Firebase password for <strong>skumbeni@gmail.com</strong>. Saved on this device after first login.</p>
+        <div class="form-row">
+          <label>Firebase Password</label>
+          <input type="password" id="settingFbPw" placeholder="Enter Firebase Auth password"/>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="saveSettingFbPw()">Save Firebase Password</button>
+        <div id="fbPwSettingMsg" style="display:none;margin-top:.6rem" class="alert"></div>
+      </div>
       <div class="settings-card">
         <h3>🗑️ Data Management</h3>
         <p style="font-size:.82rem;color:var(--muted);margin-bottom:.75rem">Clear all local subscription data. Firebase data is not affected.</p>
@@ -1797,6 +1812,11 @@ const _LOCKOUT_MS=15*60*1000; // 15 minutes
 function _getLockout(){try{const v=localStorage.getItem('mca_lockout');return v?JSON.parse(v):{attempts:0,until:0};}catch{return{attempts:0,until:0};}}
 function _setLockout(d){try{localStorage.setItem('mca_lockout',JSON.stringify(d));}catch{}}
 
+// Firebase password stored separately from panel password
+const FB_PW_KEY='mca_fb_pw';
+function getSavedFbPw(){try{return localStorage.getItem(FB_PW_KEY)||'';}catch(e){return '';}}
+function saveFbPw(pw){try{localStorage.setItem(FB_PW_KEY,pw);}catch(e){}}
+
 function doLogin(){
   const lockout=_getLockout();
   const now=Date.now();
@@ -1809,12 +1829,26 @@ function doLogin(){
   }
   const pw=document.getElementById('loginPw').value;
   if(pw===getPassword()){
+    // Check we have a Firebase password — either saved or typed
+    const savedFbPw=getSavedFbPw();
+    const typedFbPw=(document.getElementById('loginFbPw')?.value||'').trim();
+    const fbPw=typedFbPw||savedFbPw;
+    if(!fbPw){
+      // Show Firebase password field and ask user to fill it
+      const wrap=document.getElementById('fbPwWrap');
+      if(wrap){wrap.style.display='block';document.getElementById('loginFbPw').focus();}
+      err.textContent='Enter your Firebase Auth password to continue.';
+      err.className='alert alert-warn';
+      err.style.display='block';
+      return;
+    }
+    if(typedFbPw) saveFbPw(typedFbPw); // persist for future logins
     _setLockout({attempts:0,until:0});
     document.getElementById('loginPage').style.display='none';
     document.getElementById('app').style.display='block';
     loadSettings();
     refreshAll();
-    connectFirebase(JSON.stringify(getSavedFbConfig()),pw);
+    connectFirebase(JSON.stringify(getSavedFbConfig()),fbPw);
   }else{
     const attempts=lockout.attempts+1;
     const until=attempts>=_MAX_ATTEMPTS?now+_LOCKOUT_MS:0;
@@ -1825,6 +1859,7 @@ function doLogin(){
     } else {
       err.textContent='Incorrect password. '+(remaining>0?remaining+' attempt'+(remaining!==1?'s':'')+' remaining.':'');
     }
+    err.className='alert alert-err';
     err.style.display='block';
     setTimeout(()=>err.style.display='none',4000);
   }
@@ -2148,14 +2183,12 @@ function confirmApprove(){
     renderZoneManager();
     renderZoneWaGroupList();
   }
-  // Save locally and close immediately — Firebase syncs in background
   save(KEYS.subs,subs);
   refreshAll();
   closeModal('approveModal');
-  // Background Firebase sync — non-blocking
   fbWriteItem(subs[i])
-    .then(()=>showFbMsg('\u2705 Rider activated and synced to Firebase!','alert-ok'))
-    .catch(err=>showFbMsg('\u26a0\ufe0f Activated locally. Firebase will retry: '+err.message,'alert-warn'));
+    .then(()=>showFbMsg('\u2705 Rider activated and synced!','alert-ok'))
+    .catch(err=>showFbMsg('\u26a0\ufe0f Activated locally. Firebase: '+err.message,'alert-warn'));
 }
 
 function rejectApp(appId){
@@ -2168,10 +2201,9 @@ function rejectApp(appId){
     save(KEYS.subs,subs);
     closeModal('confirmModal');
     refreshAll();
-    // Background Firebase sync
     if(i>-1) fbWriteItem(subs[i])
-      .then(()=>showFbMsg('\u2705 Application rejected and synced.','alert-ok'))
-      .catch(()=>showFbMsg('\u26a0\ufe0f Rejected locally. Firebase will retry.','alert-warn'));
+      .then(()=>showFbMsg('\u2705 Rejected and synced.','alert-ok'))
+      .catch(()=>showFbMsg('\u26a0\ufe0f Rejected locally. Will retry.','alert-warn'));
   };
   openModal('confirmModal');
 }
@@ -2283,10 +2315,9 @@ function confirmApproveAdv(){
   save(KEYS.advertisers,ads);
   refreshAll();
   closeModal('approveAdvModal');
-  // Background Firebase sync
   fbAdvWriteItem(ads[i])
-    .then(()=>showFbMsg('\u2705 Advertiser activated and synced to Firebase!','alert-ok'))
-    .catch(err=>showFbMsg('\u26a0\ufe0f Activated locally. Firebase will retry: '+err.message,'alert-warn'));
+    .then(()=>showFbMsg('\u2705 Advertiser activated and synced!','alert-ok'))
+    .catch(err=>showFbMsg('\u26a0\ufe0f Activated locally. Firebase: '+err.message,'alert-warn'));
 }
 
 function rejectAdv(advId){
@@ -2299,10 +2330,9 @@ function rejectAdv(advId){
     save(KEYS.advertisers,ads);
     closeModal('confirmModal');
     refreshAll();
-    // Background Firebase sync
     if(i>-1) fbAdvWriteItem(ads[i])
-      .then(()=>showFbMsg('\u2705 Advertiser rejected and synced.','alert-ok'))
-      .catch(()=>showFbMsg('\u26a0\ufe0f Rejected locally. Firebase will retry.','alert-warn'));
+      .then(()=>showFbMsg('\u2705 Rejected and synced.','alert-ok'))
+      .catch(()=>showFbMsg('\u26a0\ufe0f Rejected locally. Will retry.','alert-warn'));
   };
   openModal('confirmModal');
 }
@@ -2650,6 +2680,16 @@ function changePassword(){
   save(KEYS.pw,nw);
   show('Password updated successfully.','alert-ok');
   ['curPw','newPw','confPw'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+}
+
+function saveSettingFbPw(){
+  const pw=document.getElementById('settingFbPw').value.trim();
+  const msg=document.getElementById('fbPwSettingMsg');
+  const show=(t,cls)=>{msg.textContent=t;msg.className='alert '+cls;msg.style.display='block';setTimeout(()=>msg.style.display='none',3500);};
+  if(!pw){show('Please enter a password.','alert-err');return;}
+  saveFbPw(pw);
+  document.getElementById('settingFbPw').value='';
+  show('✅ Firebase password saved. It will be used on next login.','alert-ok');
 }
 
 function clearAllData(){

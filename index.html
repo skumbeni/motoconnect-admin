@@ -1489,26 +1489,39 @@ function setFbStatus(connected,msg){
   if(lbl)lbl.textContent=connected?'Live':'Offline';
 }
 
-// Signs this admin panel in with a REAL Firebase identity (not anonymous).
-// Your Database Rules check auth.uid against a specific admin account's UID,
+// Signs this admin panel in with a REAL Firebase identity (email + password).
+// Your Database Rules check auth.uid against the admin account's UID,
 // so this panel needs to authenticate as that exact account to be allowed
-// to approve/edit/delete records. Anonymous tokens are no longer enough.
+// to approve/edit/delete records.
 //
-// There's only ever one admin email (ADMIN_FIREBASE_EMAIL above), so it's
-// never asked for. The password is reused from whatever you typed into the
-// normal login screen — no separate Firebase login step at all in everyday
-// use. Firebase also persists the signed-in session in this browser (the
-// app name is fixed, not regenerated each time), so even the password
-// prompt only fires once per device, on first connect.
-async function _adminSignIn(){
+// The email is hardcoded (ADMIN_FIREBASE_EMAIL). The password is whatever
+// was typed at the local login screen and passed in here — no separate
+// Firebase login step. Firebase also persists the signed-in session in
+// this browser (fixed app name), so the round-trip only happens once per
+// device on first connect.
+async function _adminSignIn(password){
+  // If already signed in as the right user, reuse the session
   await new Promise(res=>{
     const unsub=_fbAuth.onAuthStateChanged(u=>{unsub();res(u);});
   });
-  if(_fbAuth.currentUser)return _fbAuth.currentUser;
+  if(_fbAuth.currentUser && _fbAuth.currentUser.email===ADMIN_FIREBASE_EMAIL){
+    return _fbAuth.currentUser;
+  }
+  // Sign out any stale session first
+  try{await _fbAuth.signOut();}catch(e){}
+  if(!password){
+    // No password available — prompt the user once
+    password=window.prompt('Enter your Firebase admin password to connect:');
+    if(!password) throw new Error('Password is required to connect to Firebase.');
+  }
   try{
-    const cred=await _fbAuth.signInAnonymously();
+    const cred=await _fbAuth.signInWithEmailAndPassword(ADMIN_FIREBASE_EMAIL, password);
     return cred.user;
   }catch(authErr){
+    // Provide a clear message for wrong-password vs other errors
+    if(authErr.code==='auth/wrong-password'||authErr.code==='auth/invalid-credential'){
+      throw new Error('Firebase auth failed: incorrect password for '+ADMIN_FIREBASE_EMAIL+'. Check that your local admin password matches the Firebase account password.');
+    }
     throw new Error('Firebase sign-in failed: '+authErr.message);
   }
 }
@@ -1533,7 +1546,7 @@ async function connectFirebase(configStr,password){
     // IMPORTANT: await auth before marking connected. The .info/connected
     // listener fires as soon as the DB socket opens — before the auth token
     // propagates — so writes immediately after load were rejected by Rules.
-    const user=await _adminSignIn();
+    const user=await _adminSignIn(password);
     if(!user){throw new Error('Firebase sign-in returned no user.');}
     await new Promise(res=>setTimeout(res,500));
     save(KEYS.fbConfig,parsed);

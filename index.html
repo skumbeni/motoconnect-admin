@@ -275,6 +275,7 @@
         📣 Advertisers
         <span class="nav-badge" id="advBadge" style="display:none">0</span>
       </div>
+      <div class="nav-item" id="nav-redemptions" onclick="showPage('redemptions',this)">🎁 Redemptions</div>
 
       <div class="nav-label">System</div>
       <div class="nav-item" id="nav-firebase" onclick="showPage('firebase',this)">🔥 Firebase Sync</div>
@@ -448,6 +449,29 @@
       </div>
       <div id="advQueueList">
         <div class="empty"><div class="empty-icon">📣</div><p>No advertiser listings found</p></div>
+      </div>
+    </div>
+
+    <!-- ── REDEMPTIONS (voucher / rider reward log — read-only) ── -->
+    <div class="page" id="page-redemptions">
+      <div class="page-head">
+        <div>
+          <h2>Rider Reward Redemptions</h2>
+          <div class="page-head-sub">Visit/spend log recorded by advertisers via the public Verify link — read-only, synced live from Firebase</div>
+        </div>
+      </div>
+      <div class="toolbar">
+        <input class="search-input" placeholder="🔍 Search rider name, phone, business…" id="redSearch" oninput="renderRedemptions()"/>
+        <select class="filter-select" id="redFilterAdv" onchange="renderRedemptions()">
+          <option value="">All Businesses</option>
+        </select>
+        <select class="filter-select" id="redFilterReward" onchange="renderRedemptions()">
+          <option value="">All Entries</option>
+          <option value="fired">🎉 Reward Fired Only</option>
+        </select>
+      </div>
+      <div id="redemptionsList">
+        <div class="empty"><div class="empty-icon">🎁</div><p>No redemptions logged yet</p></div>
       </div>
     </div>
 
@@ -1108,7 +1132,7 @@
 // ══════════════════════════════════════════════════════
 //  CONSTANTS & STATE
 // ══════════════════════════════════════════════════════
-const KEYS={pw:'mc_password',subs:'mc_subscriptions',settings:'mc_admin_settings',fbConfig:'mc_fb_config',fbPw:'mc_fb_pw',zones:'mc_zones_v2',advertisers:'mc_advertisers',pendingWrites:'mc_pending_writes',pendingAdvWrites:'mc_pending_adv_writes',pendingZoneWrites:'mc_pending_zone_writes'};
+const KEYS={pw:'mc_password',subs:'mc_subscriptions',settings:'mc_admin_settings',fbConfig:'mc_fb_config',fbPw:'mc_fb_pw',zones:'mc_zones_v2',advertisers:'mc_advertisers',redemptions:'mc_voucher_redemptions',pendingWrites:'mc_pending_writes',pendingAdvWrites:'mc_pending_adv_writes',pendingZoneWrites:'mc_pending_zone_writes'};
 const DEFAULT_PW='admin123';
 const FB_PATH='motoconnect_zambia';
 let state={adminName:'Admin',warnDays:7};
@@ -1123,6 +1147,7 @@ function getPassword(){return load(KEYS.pw,DEFAULT_PW);}
 function getSubs(){return load(KEYS.subs,[]);}
 function getSettings(){return load(KEYS.settings,{adminName:'Admin',warnDays:7});}
 function getAdvertisers(){return load(KEYS.advertisers,[]);}
+function getRedemptions(){return load(KEYS.redemptions,[]);}
 // Offline write queues — rehydrated from localStorage (not just an
 // in-memory array) so that an approval made while offline survives a
 // page reload, tab close, or dropped connection instead of being lost
@@ -1860,57 +1885,55 @@ function attachListeners(){
   });
 
   // Real-time zones listener — keeps admin in sync with public app zone additions.
-  // Merge strategy:
-  //   • FB wins on conflict (same id, newer or equal timestamp).
-  //   • Local-only zones whose id is in _pendingZoneWrites are "not yet synced" → keep.
-  //   • Local-only zones whose id is NOT pending are "deleted remotely" → drop.
+  // Merge strategy (safe union — never silently delete a zone just because
+  // Firebase hasn't seen it yet; that previously wiped out unsynced seed
+  // zones whenever /zones was empty or partial on Firebase):
+  //   • Union of local + FB. FB wins field-values on conflict (same id),
+  //     unless local has a strictly newer updatedAt.
+  //   • Local-only zones (never pushed to FB) are KEPT locally and also
+  //     auto-pushed up to FB so they stop being "local-only".
   //   • Tombstones (z.__deleted===true) from FB always win — remove locally.
+  //   • Actual deletions still work: adminDeleteZone() removes the zone from
+  //     localStorage immediately and pushes a tombstone+remove to FB; this
+  //     listener no longer needs to infer deletions from absence.
   _fbDb.ref(FB_PATH+'/zones').on('value',snap=>{
     const data=snap.val();
     const local=getZones();
-    // Set of ids we have queued to write (not yet confirmed by FB)
-    const pendingIds=new Set(_pendingZoneWrites.map(w=>w.id).filter(Boolean));
-
+    const fbMap={};
     if(data&&typeof data==='object'){
-      const fbMap={};
       Object.values(data).filter(Boolean).forEach(z=>{if(z&&z.id)fbMap[z.id]=z;});
-
-      const merged={};
-      // Start from FB as the source of truth
-      Object.assign(merged,fbMap);
-
-      // Walk local zones: decide what to keep beyond what FB already has
-      local.forEach(z=>{
-        if(!z||!z.id)return;
-        const fbItem=fbMap[z.id];
-        if(fbItem){
-          // Both sides have it — FB already won via Object.assign above.
-          // Only override if local is strictly newer (has a updatedAt that beats FB).
-          const localTs=z.updatedAt?new Date(z.updatedAt).getTime():0;
-          const fbTs=fbItem.updatedAt?new Date(fbItem.updatedAt).getTime():0;
-          if(localTs>fbTs) merged[z.id]=z;
-        } else {
-          // FB doesn't have this zone.
-          if(pendingIds.has(z.id)){
-            // We know we wrote it but the push hasn't landed yet → keep it.
-            merged[z.id]=z;
-          }
-          // else: FB never had it and we're not waiting to push it →
-          // it was deleted remotely; do NOT re-add it.
-        }
-      });
-
-      // Honour tombstones: anything FB marks __deleted must be removed.
-      Object.values(merged).forEach(z=>{if(z&&z.__deleted)delete merged[z.id];});
-
-      save(KEYS.zones,Object.values(merged).filter(Boolean));
-    } else {
-      // FB returned null/empty.  Only keep local zones that are still pending.
-      // Everything else has either never been pushed or was deleted remotely.
-      const kept=local.filter(z=>z&&z.id&&pendingIds.has(z.id));
-      save(KEYS.zones,kept);
     }
+
+    const merged={};
+    // Start from local so nothing local ever silently vanishes.
+    local.forEach(z=>{if(z&&z.id)merged[z.id]=z;});
+
+    // Overlay FB data: FB wins unless local is strictly newer.
+    Object.values(fbMap).forEach(fbItem=>{
+      if(!fbItem||!fbItem.id)return;
+      const localItem=merged[fbItem.id];
+      if(!localItem){
+        merged[fbItem.id]=fbItem; // new zone from another device
+      } else {
+        const localTs=localItem.updatedAt?new Date(localItem.updatedAt).getTime():0;
+        const fbTs=fbItem.updatedAt?new Date(fbItem.updatedAt).getTime():0;
+        if(fbTs>=localTs) merged[fbItem.id]=fbItem;
+        // else keep local (strictly newer) — nothing to do
+      }
+    });
+
+    // Any local zone Firebase doesn't have yet: keep it, and queue it to be
+    // pushed up so it becomes properly synced instead of getting dropped.
+    const toPush=local.filter(z=>z&&z.id&&!fbMap[z.id]);
+
+    // Honour tombstones: anything FB marks __deleted must be removed.
+    Object.keys(merged).forEach(id=>{if(merged[id]&&merged[id].__deleted)delete merged[id];});
+
+    save(KEYS.zones,Object.values(merged).filter(Boolean));
     renderZoneManager&&renderZoneManager();
+
+    // Auto-heal: push local-only zones (e.g. unsynced seed data) up to FB.
+    toPush.forEach(z=>{fbZoneWriteItem(z).catch(()=>{});});
   },err=>{
     console.error('FB zones listener error:',err);
     // Keep rendering from local cache on error
@@ -1965,6 +1988,26 @@ function attachListeners(){
     console.error('FB advertiser listener error:',err);
     // Still render from local cache on error so existing data isn't lost
     refreshAll();
+  });
+
+  // Real-time redemptions listener — READ-ONLY. Admin's Firebase Rules
+  // only grant the admin account create/edit rights on subscriptions,
+  // advertisers, and zones; redemptions are written by advertiser staff
+  // via the public Verify page. There's nothing for the admin panel to
+  // push back, so this is a straight overwrite-from-Firebase (no local-
+  // wins merge needed — Firebase is always the source of truth here).
+  _fbDb.ref(FB_PATH+'/redemptions').on('value',snap=>{
+    const data=snap.val();
+    if(data&&typeof data==='object'){
+      const items=Object.values(data).filter(Boolean);
+      save(KEYS.redemptions,items);
+    }else{
+      save(KEYS.redemptions,[]);
+    }
+    renderRedemptions&&renderRedemptions();
+  },err=>{
+    console.error('FB redemptions listener error:',err);
+    renderRedemptions&&renderRedemptions();
   });
 
   // Connection state — flush offline queue on reconnect.
@@ -2112,7 +2155,13 @@ async function flushPendingWrites(){
     _persistPendingAdvWrites();
     const stillFailed=[];
     for(const item of advQueue){
-      try{ await _fbDb.ref(FB_PATH+'/advertisers/'+item.id).set(item); }
+      try{
+        if(item&&item.type==='delete'){
+          await _fbDb.ref(FB_PATH+'/advertisers/'+item.id).remove();
+        }else{
+          await _fbDb.ref(FB_PATH+'/advertisers/'+item.id).set(item);
+        }
+      }
       catch(err){ stillFailed.push(item); console.error('Advertiser flush failed:',err); }
     }
     if(stillFailed.length){_pendingAdvWrites=[...stillFailed,..._pendingAdvWrites];_persistPendingAdvWrites();}
@@ -2269,7 +2318,7 @@ function doLogout(){
 // ══════════════════════════════════════════════════════
 //  NAVIGATION
 // ══════════════════════════════════════════════════════
-const pageTitles={dashboard:'Dashboard',applications:'Rider Applications',subscriptions:'All Subscriptions',renewals:'Renewals Due',advertisers:'Advertiser Listings',firebase:'Firebase Sync',settings:'Settings'};
+const pageTitles={dashboard:'Dashboard',applications:'Rider Applications',subscriptions:'All Subscriptions',renewals:'Renewals Due',advertisers:'Advertiser Listings',redemptions:'Rider Reward Redemptions',firebase:'Firebase Sync',settings:'Settings'};
 
 function showPage(id,navEl){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
@@ -2284,6 +2333,7 @@ function showPage(id,navEl){
   else if(id==='subscriptions')renderSubscriptions();
   else if(id==='renewals')renderRenewals();
   else if(id==='advertisers')renderAdvertisers();
+  else if(id==='redemptions')renderRedemptions();
   else if(id==='settings')loadSettingsPage();
   else if(id==='firebase'){
     const pwField=document.getElementById('fbPwInput');
@@ -2321,7 +2371,7 @@ function vehicleIcon(type){
 // ══════════════════════════════════════════════════════
 //  STATS
 // ══════════════════════════════════════════════════════
-function refreshAll(){renderDashboard();renderApplications();renderSubscriptions();renderRenewals();renderAdvertisers();updateBadges();updateAdvBadge();}
+function refreshAll(){renderDashboard();renderApplications();renderSubscriptions();renderRenewals();renderAdvertisers();renderRedemptions&&renderRedemptions();updateBadges();updateAdvBadge();}
 
 function getSubStats(){
   const subs=getSubs();
@@ -2677,6 +2727,54 @@ function renderAdvertisers(){
   }).join('');
 }
 
+function renderRedemptions(){
+  const search=(document.getElementById('redSearch')?.value||'').toLowerCase();
+  const fAdv=document.getElementById('redFilterAdv')?.value||'';
+  const fReward=document.getElementById('redFilterReward')?.value||'';
+  let reds=getRedemptions();
+
+  // Keep the "All Businesses" filter dropdown populated with whichever
+  // advertisers actually have redemption entries, so it doesn't show
+  // ghost businesses with zero activity.
+  const advSel=document.getElementById('redFilterAdv');
+  if(advSel){
+    const names=[...new Set(reds.map(r=>r.advertiserName).filter(Boolean))].sort();
+    const current=advSel.value;
+    advSel.innerHTML='<option value="">All Businesses</option>'+names.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('');
+    if(names.includes(current))advSel.value=current;
+  }
+
+  if(search)reds=reds.filter(r=>((r.riderName||'')+(r.riderPhone||'')+(r.advertiserName||'')).toLowerCase().includes(search));
+  if(fAdv)reds=reds.filter(r=>r.advertiserName===fAdv);
+  if(fReward==='fired')reds=reds.filter(r=>r.rewardFired);
+  reds=reds.slice().sort((a,b)=>new Date(b.loggedAt||0)-new Date(a.loggedAt||0));
+
+  const el=document.getElementById('redemptionsList');
+  if(!el)return;
+  if(!reds.length){
+    el.innerHTML='<div class="empty"><div class="empty-icon">🎁</div><p>No redemptions logged yet</p><p style="font-size:.75rem;margin-top:.3rem">Entries appear here when advertiser staff log a rider visit through the public Verify link.</p></div>';
+    return;
+  }
+
+  el.innerHTML=reds.map(r=>{
+    const dateStr=r.loggedAt?new Date(r.loggedAt).toLocaleString('en-ZM',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
+    const modelStr=r.model==='spend'?`K${(r.cumulativeSpendAtLog||0).toLocaleString()} cumulative spend`:`Visit #${r.visitNumberAtLog||'—'}`;
+    return`<div class="app-card ${r.rewardFired?'active':'pending'}">
+      <div class="app-icon">${r.rewardFired?'🎉':'🎁'}</div>
+      <div class="app-info">
+        <div class="app-name">${esc(r.riderName||'Unknown rider')}${r.rewardFired?`<span class="badge badge-active" style="margin-left:.5rem;vertical-align:middle">Reward Fired</span>`:''}</div>
+        <div class="app-meta">
+          📞 ${esc(r.riderPhone||'—')} &nbsp;·&nbsp; 🏪 ${esc(r.advertiserName||'—')} &nbsp;·&nbsp; ${dateStr}<br>
+          ${modelStr}${r.amount?` &nbsp;·&nbsp; K${Number(r.amount).toLocaleString()} this visit`:''}
+          ${r.offerAtRedemption?`<br>🏷️ Offer at time: ${esc(r.offerAtRedemption)}`:''}
+          ${r.note?`<br><em style="color:var(--muted)">${esc(r.note)}</em>`:''}
+        </div>
+        <span class="app-ref">${esc(r.id)}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
 function getAdvStats(){
   const ads=getAdvertisers();
   const pending=ads.filter(a=>a.status==='pending');
@@ -2840,17 +2938,27 @@ function deleteAdv(advId){
   document.getElementById('confirmOkBtn').onclick=async()=>{
     const ads=getAdvertisers().filter(a=>a.id!==advId);
     save(KEYS.advertisers,ads);
+    // Drop any queued add/edit writes for this advertiser — a delete
+    // supersedes them, same dedupe pattern used for zone writes.
+    _pendingAdvWrites=_pendingAdvWrites.filter(w=>(w&&w.type==='delete'?w.id:w?.id)!==advId);
     // Also remove from Firebase
     if(_fbDb&&_fbConnected){
       try{
         setSyncDot('syncing');
         await _fbDb.ref(FB_PATH+'/advertisers/'+advId).remove();
         setSyncDot('live');
+        _persistPendingAdvWrites();
         showFbMsg('✅ Advertiser deleted and synced.','alert-ok');
       }catch(e){
         setSyncDot('live');
-        showFbMsg('⚠️ Deleted locally. Firebase sync pending.','alert-warn');
+        _pendingAdvWrites.push({type:'delete',id:advId});
+        _persistPendingAdvWrites();
+        showFbMsg('⚠️ Deleted locally. Firebase: '+e.message,'alert-warn');
       }
+    }else{
+      _pendingAdvWrites.push({type:'delete',id:advId});
+      _persistPendingAdvWrites();
+      showFbMsg('⚠️ Deleted locally. Will sync when reconnected.','alert-warn');
     }
     closeModal('confirmModal');
     refreshAll();

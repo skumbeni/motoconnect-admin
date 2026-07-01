@@ -354,7 +354,7 @@
         <div class="stat-card">
           <div class="stat-label">Monthly Revenue</div>
           <div class="stat-value text-accent" id="statRevenue">K0</div>
-          <div class="stat-sub stat-up">Active subscriptions</div>
+          <div class="stat-sub stat-up">Riders: <span id="statRiderRevenue">K0</span> · Ads: <span id="statAdvRevenue">K0</span></div>
         </div>
         <div class="stat-card">
           <div class="stat-label">Expired</div>
@@ -2397,14 +2397,18 @@ function updateBadges(){
 // ══════════════════════════════════════════════════════
 function renderDashboard(){
   const{subs,active,pending,expired,expiring,revenue}=getSubStats();
+  const advStats=getAdvStats();
+  const totalRevenue=revenue+advStats.revenue;
   const set=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
   set('statTotal',subs.filter(s=>!s.isApplication||s.status!=='pending').length);
   set('statActive',active.length);
   set('statPending',pending.length);
-  set('statAdvPending',getAdvStats().pending.length);
+  set('statAdvPending',advStats.pending.length);
   set('statExpiring',expiring.length);
   set('statExpiringNote',`Within ${state.warnDays} days`);
-  set('statRevenue','K'+revenue.toLocaleString());
+  set('statRevenue','K'+totalRevenue.toLocaleString());
+  set('statRiderRevenue','K'+revenue.toLocaleString());
+  set('statAdvRevenue','K'+advStats.revenue.toLocaleString());
   set('statExpired',expired.length);
 
   // Recent apps
@@ -2778,7 +2782,9 @@ function renderRedemptions(){
 function getAdvStats(){
   const ads=getAdvertisers();
   const pending=ads.filter(a=>a.status==='pending');
-  return{ads,pending};
+  const active=ads.filter(a=>a.status==='active');
+  const revenue=active.reduce((a,x)=>a+(Number(x.price)||0),0);
+  return{ads,pending,active,revenue};
 }
 
 function updateAdvBadge(){
